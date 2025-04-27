@@ -154,9 +154,8 @@ def import_energy(file, conn):
 args = argparse.ArgumentParser()
 args.add_argument(
     "--reset",
-    type=str,
-    default=None,
-    help="Reset database schema using provided .sql file",
+    action="store_true",
+    help="Reset database schema using vendored .sql file",
 )
 args.add_argument(
     "--energy",
@@ -179,7 +178,7 @@ if __name__ == "__main__":
     ) as conn:
         if opt.reset is not None:
             erase_tables(conn)
-            create_tables(conn, opt.reset)
+            create_tables(conn, "schema.sql")
 
         if opt.energy:
             import_energy("energy.csv", conn)

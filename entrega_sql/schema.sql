@@ -13,18 +13,23 @@ CREATE TABLE "Populacao" (
 
 CREATE TABLE "Escolaridade" (
   "id" int GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  "grupo_etario" varchar,
-  "primary_attained" numeric,
-  "secondary_attained" numeric,
-  "tertiary_attained" numeric,
-  "pais_id" int NOT NULL
+  "porc_sem_escolaridade" numeric,
+  "porc_primario_alcançado" numeric,
+  "porc_primario_completo" numeric,
+  "porc_secundario_alcançado" numeric,
+  "porc_secundario_completo" numeric,
+  "porc_superior_alcançado" numeric,
+  "porc_superior_completo" numeric,
+  "populacao_id" int NOT NULL
 );
 
 CREATE TABLE "Media_Estudo" (
   "id" int GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  "media_anos_primario" numeric,
+  "media_anos_secundario" numeric,
+  "media_anos_superior" numeric,
   "media_anos_estudo" numeric,
-  "grupo_etario" varchar,
-  "pais_id" int NOT NULL
+  "populacao_id" int NOT NULL
 );
 
 CREATE TABLE "Energia" (
@@ -63,9 +68,9 @@ CREATE TABLE "Fonte" (
 
 ALTER TABLE "Populacao" ADD FOREIGN KEY ("pais_id") REFERENCES "Pais" ("id");
 
-ALTER TABLE "Escolaridade" ADD FOREIGN KEY ("pais_id") REFERENCES "Pais" ("id");
+ALTER TABLE "Escolaridade" ADD FOREIGN KEY ("populacao_id") REFERENCES "Populacao" ("id");
 
-ALTER TABLE "Media_Estudo" ADD FOREIGN KEY ("pais_id") REFERENCES "Pais" ("id");
+ALTER TABLE "Media_Estudo" ADD FOREIGN KEY ("populacao_id") REFERENCES "Populacao" ("id");
 
 ALTER TABLE "Producao" ADD FOREIGN KEY ("pais_id") REFERENCES "Pais" ("id");
 
