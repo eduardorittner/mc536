@@ -1,10 +1,11 @@
 CREATE TABLE "Pais" (
   "id" int GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  "nome" varchar
+  "nome" varchar UNIQUE
 );
 
 CREATE TABLE "Populacao" (
   "id" int GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  "ano" int NOT NULL,
   "sexo" varchar,
   "faixa_etaria" varchar,
   "quantidade" bigint,
