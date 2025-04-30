@@ -3,7 +3,7 @@
 This project was developed by
 - Eduardo Rittner Coelho (250960)
 - André Ribeiro do Valle Pereira (244185)
-- André
+- André Macarini da Silva (246929)
 
 This repository is home to our project on the MC536 course, which has two stages: A first one dealing with SQL databases (specifically PostgreSQL) and the second using No-SQL databases. We have chosen the [Barrolee](http://barrolee.com/) dataset on country education and scholarity levels and the [Our World in Energy Data](https://github.com/owid/energy-data) dataset on country energy production and consumption levels.
 
