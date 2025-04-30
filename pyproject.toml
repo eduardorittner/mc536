@@ -1,0 +1,12 @@
+[project]
+name = "import-bd"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "argparse>=1.4.0",
+    "pandas>=2.2.3",
+    "psycopg2>=2.9.10",
+    "tqdm>=4.67.1",
+]
