@@ -14,12 +14,20 @@ In the modern age, energy is more useful than ever, since anything remotely auto
 This project requires a python version greater than 3.13, and needs `psycopg2` to communicate with the postgres db, `pandas` to parse and process the datasets, `tqdm` to display progress and `argparse` to parse command line arguments. These dependencies are specified both in `pyproject.toml` and `requirements.txt`.
 
 All the functionality is in db.py and is gated behind command-line flags. For a list of them, run `python3 bd.py --help`. The main ones are:
+
 - `--clean`: Performs a clean start, resets the database schema and loads both datasets
 - `--reset`: Only resets the database schema, not loading any data.
 - `--energy`: Reload only the energy dataset.
 - `--education`: Reload only the education dataset.
 - `--queries`: Comma-delimited list of queries. For all queries use `--queries all`. The list of available queries is:
     - "education-variation"
+
+The connection parameters can be configured via cli arguments as well:
+- `--dbname`: Default is Educacao-e-energia
+- `--user`: Default is postgres
+- `--password`: Default is blank password
+- `--host`: Default is localhost
+- `--port`: Default is 5432
 
 
 ## Conceptual Model

@@ -360,6 +360,11 @@ args.add_argument(
 args.add_argument(
     "--education", action="store_true", help="Import data from education dataset"
 )
+args.add_argument("--dbname", type=str, default="Educacao-e-energia")
+args.add_argument("--user", type=str, default="postgres")
+args.add_argument("--password", type=str, default="")
+args.add_argument("--host", type=str, default="localhost")
+args.add_argument("--port", type=str, default="5432")
 
 args.add_argument("--queries", type=str, help="Queries to perform, delimited by commas")
 
@@ -367,11 +372,11 @@ if __name__ == "__main__":
     opt = args.parse_args()
 
     with psycopg2.connect(
-        dbname="Educacao-e-energia",
-        user="postgres",
-        password="",
-        host="localhost",
-        port="5432",
+        dbname=opt.dbname,
+        user=opt.user,
+        password=opt.password,
+        host=opt.localhost,
+        port=opt.port,
     ) as conn:
         if opt.reset_schema or opt.clean:
             erase_tables(conn)
