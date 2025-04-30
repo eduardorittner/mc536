@@ -530,32 +530,25 @@ if __name__ == "__main__":
         if opt.education or opt.clean:
             import_education("education.csv", conn)
 
-        if opt.queries is not None:
-            for query in opt.queries.split(","):
-                match query:
-                    case "all":
-                        highest_education_variation(conn)
-                        consumo_educacao(conn)
-                        producao_educacao(conn)
-                        correlacao_educacao_energia(conn)
-                    case "education-variation":
-                        highest_education_variation(conn)
-                    case "consumo-educacao":
-                        consumo_educacao(conn)
-                    case "producao-educacao":
-                        producao_educacao(conn)
-                    case "correlacao":
-                        correlacao_educacao_energia(conn)
-                    case default:
-                        print(f"Skipping unknown query: {query}")
-        
-        if opt.queries is not None:
-            for query in opt.queries.split(","):
-                match query:
-                    case "education-variation":
-                        highest_education_variation(conn)
-                    case "education-disparity-energy":
-                        education_disparity_energy(conn)
-                    case default:
-                        print(f"Skipping unknown query: {query}")
+if opt.queries is not None:
+    for query in opt.queries.split(","):
+        match query:
+            case "all":
+                highest_education_variation(conn)
+                consumo_educacao(conn)
+                producao_educacao(conn)
+                correlacao_educacao_energia(conn)
+                education_disparity_energy(conn)
+            case "education-variation":
+                highest_education_variation(conn)
+            case "consumo-educacao":
+                consumo_educacao(conn)
+            case "producao-educacao":
+                producao_educacao(conn)
+            case "correlacao":
+                correlacao_educacao_energia(conn)
+            case "education-disparity-energy":
+                education_disparity_energy(conn)
+            case _:
+                print(f"Skipping unknown query: {query}")
 
