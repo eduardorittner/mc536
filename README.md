@@ -22,7 +22,10 @@ All the functionality is in db.py and is gated behind command-line flags. For a 
 - `--energy`: Reload only the energy dataset.
 - `--education`: Reload only the education dataset.
 - `--queries`: Comma-delimited list of queries. For all queries use `--queries all`. The list of available queries is:
-    - "education-variation"
+    - "education-variation": Finds the countries with highest variation in average years of schooling from 2000 to 2010 and displays their energy production levels
+    - "consumo-educacao"
+    - "producao-educacao"
+    - "correlacao"
 
 The connection parameters can be configured via cli arguments as well:
 - `--dbname`: Default is Educacao-e-energia

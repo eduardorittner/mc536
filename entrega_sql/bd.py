@@ -488,6 +488,11 @@ if __name__ == "__main__":
         if opt.queries is not None:
             for query in opt.queries.split(","):
                 match query:
+                    case "all":
+                        highest_education_variation(conn)
+                        consumo_educacao(conn)
+                        producao_educacao(conn)
+                        correlacao_educacao_energia(conn)
                     case "education-variation":
                         highest_education_variation(conn)
                     case "consumo-educacao":
