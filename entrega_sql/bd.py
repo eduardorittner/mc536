@@ -438,6 +438,51 @@ def correlacao_educacao_energia(conn):
             print(row)
 
 
+def education_disparity_energy(conn):
+    query = """
+    WITH media_por_sexo AS (
+      SELECT
+        p.id AS pais_id,
+        p.nome AS pais,
+        pop.sexo,
+        AVG(me.media_anos_estudo) AS media_anos_estudo
+      FROM "Pais" p
+      JOIN "Populacao" pop ON pop.pais_id = p.id
+      JOIN "Media_Estudo" me ON me.populacao_id = pop.id
+      WHERE pop.sexo IN ('M', 'F')
+      GROUP BY p.id, p.nome, pop.sexo
+    ),
+    disparidade AS (
+      SELECT
+        m1.pais,
+        ABS(m1.media_anos_estudo - m2.media_anos_estudo) AS disparidade_educacional
+      FROM media_por_sexo m1
+      JOIN media_por_sexo m2 ON m1.pais = m2.pais
+      WHERE m1.sexo = 'M' AND m2.sexo = 'F'
+    )
+    SELECT
+      d.pais,
+      d.disparidade_educacional,
+      e.producao,
+      e.consumo
+    FROM disparidade d
+    JOIN "Pais" p ON p.nome = d.pais
+    LEFT JOIN "Producao" pr ON pr.pais_id = p.id
+    LEFT JOIN "Fonte" f ON f.id = pr.solar  -- substitua por outra fonte se necessário
+    LEFT JOIN "Energia" e ON e.id = f.energia
+    ORDER BY d.disparidade_educacional DESC;
+    """
+
+    with conn.cursor() as cur:
+        cur.execute(query)
+        results = cur.fetchall()
+        colnames = [desc[0] for desc in cur.description]
+
+    df = pd.DataFrame(results, columns=colnames)
+    print(df)
+    
+
+
 args = argparse.ArgumentParser()
 args.add_argument(
     "--reset-schema",
@@ -503,3 +548,14 @@ if __name__ == "__main__":
                         correlacao_educacao_energia(conn)
                     case default:
                         print(f"Skipping unknown query: {query}")
+        
+        if opt.queries is not None:
+            for query in opt.queries.split(","):
+                match query:
+                    case "education-variation":
+                        highest_education_variation(conn)
+                    case "education-disparity-energy":
+                        education_disparity_energy(conn)
+                    case default:
+                        print(f"Skipping unknown query: {query}")
+
