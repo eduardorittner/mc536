@@ -246,99 +246,98 @@ def import_energy(file, conn):
 
 def highest_education_variation(conn):
     sql = """
-SELECT 
+    WITH Media2000 AS (
+  SELECT 
     pop.pais_id,
-    MAX(CASE WHEN pop.ano = 2000 THEN me.media_anos_estudo END) AS media_2000,
-    MAX(CASE WHEN pop.ano = 2010 THEN me.media_anos_estudo END) AS media_2010
-FROM "Media_Estudo" me
-JOIN "Populacao" pop ON me.populacao_id = pop.id
-WHERE pop.ano IN (2000, 2010)
-GROUP BY pop.pais_id
+    AVG(me.media_anos_estudo) AS media_inicial
+  FROM "Media_Estudo" me
+  JOIN "Populacao" pop ON me.populacao_id = pop.id
+  WHERE pop.ano = 2000
+  GROUP BY pop.pais_id
+),
+Media2010 AS (
+  SELECT 
+    pop.pais_id,
+    AVG(me.media_anos_estudo) AS media_final
+  FROM "Media_Estudo" me
+  JOIN "Populacao" pop ON me.populacao_id = pop.id
+  WHERE pop.ano = 2010
+  GROUP BY pop.pais_id
+),
+EducationData AS (
+  SELECT 
+    m2000.pais_id,
+    m2000.media_inicial,
+    m2010.media_final
+  FROM Media2000 m2000
+  JOIN Media2010 m2010 
+    ON m2000.pais_id = m2010.pais_id
+),
+EducationDifference AS (
+  SELECT 
+    edata.pais_id,
+    edata.media_inicial,
+    edata.media_final,
+    (edata.media_final - edata.media_inicial) AS diferenca_media_estudo
+  FROM EducationData edata
+  WHERE edata.media_inicial IS NOT NULL AND edata.media_final IS NOT NULL
+),
+EnergyAggregated AS (
+  SELECT 
+    p.pais_id,
+    SUM(e1.producao) AS total_biocombustivel,
+    SUM(e2.producao) AS total_carvao,
+    SUM(e3.producao) AS total_solar,
+    SUM(e4.producao) AS total_eolica,
+    SUM(e5.producao) AS total_gas,
+    SUM(e6.producao) AS total_combustivel_fossil,
+    SUM(e7.producao) AS total_hidro,
+    SUM(e8.producao) AS total_nuclear
+  FROM "Producao" p
+  LEFT JOIN "Energia" e1 ON p.biocombustivel = e1.id
+  LEFT JOIN "Energia" e2 ON p.carvao = e2.id
+  LEFT JOIN "Energia" e3 ON p.solar = e3.id
+  LEFT JOIN "Energia" e4 ON p.eolica = e4.id
+  LEFT JOIN "Energia" e5 ON p.gas = e5.id
+  LEFT JOIN "Energia" e6 ON p.combustivel_fossil = e6.id
+  LEFT JOIN "Eletricidade" e7 ON p.hidro = e7.id
+  LEFT JOIN "Eletricidade" e8 ON p.nuclear = e8.id
+  WHERE p.ano BETWEEN 1970 AND 2010
+  GROUP BY p.pais_id
+)
+SELECT 
+  pais.nome AS pais,
+  ed.diferenca_media_estudo,
+  ea.total_biocombustivel,
+  ea.total_carvao,
+  ea.total_solar,
+  ea.total_eolica,
+  ea.total_gas,
+  ea.total_combustivel_fossil,
+  ea.total_hidro,
+  ea.total_nuclear
+FROM EducationDifference ed
+JOIN "Pais" pais ON ed.pais_id = pais.id
+JOIN EnergyAggregated ea ON ed.pais_id = ea.pais_id
+WHERE 
+  ed.diferenca_media_estudo IS NOT NULL AND
+  ea.total_biocombustivel IS NOT NULL AND
+  ea.total_carvao IS NOT NULL AND
+  ea.total_solar IS NOT NULL AND
+  ea.total_eolica IS NOT NULL AND
+  ea.total_gas IS NOT NULL AND
+  ea.total_combustivel_fossil IS NOT NULL AND
+  ea.total_hidro IS NOT NULL AND
+  ea.total_nuclear IS NOT NULL
+ORDER BY ed.diferenca_media_estudo DESC;
     """
-    sql = """
-    WITH EducationData AS (
-    SELECT 
-        pop.id AS pop_id,
-        pop.pais_id AS pais_id,
-        MAX(CASE WHEN pop.ano = 2000 THEN me.media_anos_estudo END) AS media_inicial,
-        MAX(CASE WHEN pop.ano = 2001 THEN me.media_anos_estudo END) AS media_final
-    FROM "Media_Estudo" me
-    JOIN "Populacao" pop ON me.populacao_id = pop.id
-    WHERE pop.ano IN (2000, 2001)
-    GROUP BY pop.id, pop.pais_id
-    ),
-    EducationDifference AS (
-      SELECT 
-        edata.pop_id,
-        edata.pais_id,
-        (edata.media_final - edata.media_inicial) AS diferenca_media_estudo
-      FROM EducationData edata
-      JOIN "Pais" pais ON edata.pais_id = pais.id
-    )
-    SELECT 
-      ed.pop_id,
-      ed.media_inicial,
-      ed.media_final
-    FROM EducationData ed
-    """
-    # JOIN "Pais" p ON ed.pais_id = p.id
-    # ORDER BY ed.diferenca_media_estudo DESC;
-
-    sqla = """WITH EducationData AS (
-      SELECT 
-        pop.pais_id,
-        MAX(CASE WHEN pop.ano = 2000 THEN me.media_anos_estudo END) AS media_inicial,
-        MAX(CASE WHEN pop.ano = 2020 THEN me.media_anos_estudo END) AS media_final
-      FROM "Media_Estudo" me
-      JOIN "Populacao" pop ON me.populacao_id = pop.id
-      WHERE pop.ano IN (2000, 2020)
-      GROUP BY pop.pais_id
-    ),
-    EducationDifference AS (
-      SELECT 
-        pais_id,
-        (media_final - media_inicial) AS diferenca_media_estudo
-      FROM EducationData
-      WHERE media_inicial IS NOT NULL AND media_final IS NOT NULL
-    ),
-    EnergyAggregated AS (
-      SELECT 
-        pais_id,
-        SUM(biocombustivel) AS total_biocombustivel,
-        SUM(carvao) AS total_carvao,
-        SUM(solar) AS total_solar,
-        SUM(eolica) AS total_eolica,
-        SUM(gas) AS total_gas,
-        SUM(combustivel_fossil) AS total_combustivel_fossil,
-        SUM(hidro) AS total_hidro,
-        SUM(nuclear) AS total_nuclear
-      FROM "Producao"
-      WHERE ano BETWEEN 1970 AND 2020
-      GROUP BY pais_id
-    )
-    SELECT 
-      p.nome AS pais,
-      ed.diferenca_media_estudo,
-      ea.total_biocombustivel,
-      ea.total_carvao,
-      ea.total_solar,
-      ea.total_eolica,
-      ea.total_gas,
-      ea.total_combustivel_fossil,
-      ea.total_hidro,
-      ea.total_nuclear
-    FROM EducationDifference ed
-    JOIN "Pais" p ON ed.pais_id = p.id
-    LEFT JOIN EnergyAggregated ea ON ed.pais_id = ea.pais_id
-    ORDER BY ed.diferenca_media_estudo DESC;"""
-
     print("Running highest education variation query")
 
     with conn.cursor() as cur:
         cur.execute(sql)
-        results = cur.fetchall()
+        for row in cur.fetchall():
+            print(row)
 
-    print(results)
 
 def consumo_educacao(conn):
     query = """
@@ -346,7 +345,7 @@ def consumo_educacao(conn):
       SELECT pop.pais_id, me.media_anos_estudo
       FROM "Populacao" pop
       JOIN "Media_Estudo" me ON pop.id = me.populacao_id
-      WHERE pop.ano = 2020
+      WHERE pop.ano = 2010
     ),
     ConsumoEnergia AS (
       SELECT pr.pais_id, SUM(e.producao) AS producao_total, SUM(e.consumo) AS consumo_total
@@ -366,13 +365,14 @@ def consumo_educacao(conn):
         for row in cur.fetchall():
             print(row)
 
+
 def producao_educacao(conn):
     query = """
     WITH MediaEducacao AS (
       SELECT pop.pais_id, me.media_anos_estudo
       FROM "Populacao" pop
       JOIN "Media_Estudo" me ON pop.id = me.populacao_id
-      WHERE pop.ano = 2020
+      WHERE pop.ano = 2010
     ),
     ProducaoEnergia AS (
       SELECT pr.pais_id, SUM(e.producao) AS producao_total
@@ -392,13 +392,14 @@ def producao_educacao(conn):
         for row in cur.fetchall():
             print(row)
 
+
 def correlacao_educacao_energia(conn):
     query = """
     WITH Educacao AS (
       SELECT pop.pais_id, me.media_anos_estudo
       FROM "Populacao" pop
       JOIN "Media_Estudo" me ON pop.id = me.populacao_id
-      WHERE pop.ano = 2020
+      WHERE pop.ano = 2010
     ),
     Producoes AS (
       SELECT pais_id, 
@@ -435,7 +436,8 @@ def correlacao_educacao_energia(conn):
         cur.execute(query)
         for row in cur.fetchall():
             print(row)
-            
+
+
 args = argparse.ArgumentParser()
 args.add_argument(
     "--reset-schema",
@@ -470,7 +472,7 @@ if __name__ == "__main__":
         dbname=opt.dbname,
         user=opt.user,
         password=opt.password,
-        host=opt.localhost,
+        host=opt.host,
         port=opt.port,
     ) as conn:
         if opt.reset_schema or opt.clean:
@@ -488,6 +490,11 @@ if __name__ == "__main__":
                 match query:
                     case "education-variation":
                         highest_education_variation(conn)
+                    case "consumo-educacao":
+                        consumo_educacao(conn)
+                    case "producao-educacao":
+                        producao_educacao(conn)
+                    case "correlacao":
+                        correlacao_educacao_energia(conn)
                     case default:
                         print(f"Skipping unknown query: {query}")
-
