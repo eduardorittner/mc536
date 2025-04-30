@@ -33,7 +33,11 @@ The connection parameters can be configured via cli arguments as well:
 
 
 ## Conceptual Model
-https://drive.google.com/open?id=1HDR89tRP80hXfz2H--Wh6nE5jP5u5qkB&usp=drive_copy
+
+This conceptual model represents data on demographics, education, and energy production by country and year. Each country has multiple populations, and each population—defined by year, gender, age group, and size—is linked to a country and may include associated educational attainment percentages and average years of study. Energy production data is recorded by year and country, including various sources such as solar, wind, gas, hydro, and nuclear. These sources are represented in the “Fonte” entity, which connects each energy type to its corresponding energy and electricity data, including production, consumption, and annual variation. The model ensures that every population is tied to a specific country, and every production entry is connected to a country and optionally to energy and electricity records through sources.
+
+![conceitual](https://github.com/user-attachments/assets/e9b86bf9-4de0-4f5a-836a-334b4b4ba3be)
+
 ## Relational Model
 
 The relational model reflects a normalized and modular structure that captures the connection between countries, their population demographics, education indicators, and energy production metrics. At its core, each country (Pais) is linked to multiple population groups (Populacao), segmented by year, sex, and age range. Each population group can then be analyzed educationally via two tables: Media_Estudo, which stores average years of schooling, and Escolaridade, which contains detailed percentages of educational attainment. On the energy side, each country and year combination in Producao references multiple energy sources, each of which connects to a Fonte—a bridge to both Energia (production/consumption data) and Eletricidade (electricity-specific data). This structure ensures analytical flexibility, enabling queries that associate energy profiles with educational development across time and geography.
