@@ -47,6 +47,9 @@ The relational model reflects a normalized and modular structure that captures t
 
 ![Relacional](https://github.com/user-attachments/assets/77e408ee-99a6-4d06-b826-5374cfd8c4d7)
 
+Or using the pgAdmin4
+
+![relacional_sql_post](https://github.com/user-attachments/assets/2e28d5e9-97f2-4852-93d5-5e9b67c5848f)
 
 ## Physical Model
 
