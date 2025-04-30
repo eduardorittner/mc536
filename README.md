@@ -1,7 +1,9 @@
 # MC536: Database Project - Energy production and consumption and education
 
 This project was developed by
-- Eduardo Rittner Coelho (250960)o
+- Eduardo Rittner Coelho (250960)
+- André Ribeiro do Valle Pereira (244185)
+- André
 
 This repository is home to our project on the MC536 course, which has two stages: A first one dealing with SQL databases (specifically PostgreSQL) and the second using No-SQL databases. We have chosen the [Barrolee](http://barrolee.com/) dataset on country education and scholarity levels and the [Our World in Energy Data](https://github.com/owid/energy-data) dataset on country energy production and consumption levels.
 
@@ -37,3 +39,11 @@ The connection parameters can be configured via cli arguments as well:
 ## Physical Model
 
 ## Database Schema
+
+Our database schema is designed to reflect the relationship between a country's population, its education levels, and its energy production and consumption. It was structured to accommodate both datasets in a normalized and scalable way, while preserving referential integrity between all key metrics.
+
+At the center of the schema is the "Pais" table, which contains the unique list of countries present in both datasets. The "Populacao" table captures demographic data per country, year, gender, and age group, and is linked directly to "Pais". For each population group, we store education-related statistics in two linked tables: "Media_Estudo" (average years of schooling) and "Escolaridade" (distribution across primary, secondary, and higher education levels).
+
+The energy-related data is structured around the "Producao" table, which aggregates annual production metrics per country, broken down by energy source (e.g., wind, solar, coal). Each production entry points to multiple "Fonte" records, which combine information from both "Energia" (e.g., total production/consumption) and "Eletricidade" (e.g., electricity output and share). This modular design allows us to analyze both total energy trends and electricity-specific insights for each energy type.
+
+By connecting these domains through foreign keys, the schema enables complex queries that link education metrics with energy variables — such as identifying correlations between investment in renewables and increases in schooling, or ranking countries by energy consumption relative to their education levels.
