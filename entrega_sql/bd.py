@@ -340,7 +340,102 @@ GROUP BY pop.pais_id
 
     print(results)
 
+def consumo_educacao(conn):
+    query = """
+    WITH MediaEducacao AS (
+      SELECT pop.pais_id, me.media_anos_estudo
+      FROM "Populacao" pop
+      JOIN "Media_Estudo" me ON pop.id = me.populacao_id
+      WHERE pop.ano = 2020
+    ),
+    ConsumoEnergia AS (
+      SELECT pr.pais_id, SUM(e.producao) AS producao_total, SUM(e.consumo) AS consumo_total
+      FROM "Producao" pr
+      JOIN "Fonte" f ON f.id = ANY (ARRAY[pr.biocombustivel, pr.carvao, pr.solar, pr.eolica, pr.gas, pr.combustivel_fossil, pr.hidro, pr.nuclear])
+      JOIN "Energia" e ON f.energia = e.id
+      GROUP BY pr.pais_id
+    )
+    SELECT p.nome, ce.consumo_total, me.media_anos_estudo
+    FROM ConsumoEnergia ce
+    JOIN "Pais" p ON p.id = ce.pais_id
+    LEFT JOIN MediaEducacao me ON me.pais_id = ce.pais_id
+    ORDER BY ce.consumo_total DESC;
+    """
+    with conn.cursor() as cur:
+        cur.execute(query)
+        for row in cur.fetchall():
+            print(row)
 
+def producao_educacao(conn):
+    query = """
+    WITH MediaEducacao AS (
+      SELECT pop.pais_id, me.media_anos_estudo
+      FROM "Populacao" pop
+      JOIN "Media_Estudo" me ON pop.id = me.populacao_id
+      WHERE pop.ano = 2020
+    ),
+    ProducaoEnergia AS (
+      SELECT pr.pais_id, SUM(e.producao) AS producao_total
+      FROM "Producao" pr
+      JOIN "Fonte" f ON f.id = ANY (ARRAY[pr.biocombustivel, pr.carvao, pr.solar, pr.eolica, pr.gas, pr.combustivel_fossil, pr.hidro, pr.nuclear])
+      JOIN "Energia" e ON f.energia = e.id
+      GROUP BY pr.pais_id
+    )
+    SELECT p.nome, pe.producao_total, me.media_anos_estudo
+    FROM ProducaoEnergia pe
+    JOIN "Pais" p ON p.id = pe.pais_id
+    LEFT JOIN MediaEducacao me ON me.pais_id = pe.pais_id
+    ORDER BY pe.producao_total DESC;
+    """
+    with conn.cursor() as cur:
+        cur.execute(query)
+        for row in cur.fetchall():
+            print(row)
+
+def correlacao_educacao_energia(conn):
+    query = """
+    WITH Educacao AS (
+      SELECT pop.pais_id, me.media_anos_estudo
+      FROM "Populacao" pop
+      JOIN "Media_Estudo" me ON pop.id = me.populacao_id
+      WHERE pop.ano = 2020
+    ),
+    Producoes AS (
+      SELECT pais_id, 
+        SUM(biocombustivel) AS bio,
+        SUM(carvao) AS carvao,
+        SUM(solar) AS solar,
+        SUM(eolica) AS eolica,
+        SUM(gas) AS gas,
+        SUM(combustivel_fossil) AS fossil,
+        SUM(hidro) AS hidro,
+        SUM(nuclear) AS nuclear
+      FROM "Producao"
+      GROUP BY pais_id
+    )
+    SELECT
+      'bio' AS fonte, corr(p.bio, e.media_anos_estudo) AS correlacao FROM Producoes p JOIN Educacao e ON p.pais_id = e.pais_id
+    UNION
+    SELECT 'carvao', corr(p.carvao, e.media_anos_estudo) FROM Producoes p JOIN Educacao e ON p.pais_id = e.pais_id
+    UNION
+    SELECT 'solar', corr(p.solar, e.media_anos_estudo) FROM Producoes p JOIN Educacao e ON p.pais_id = e.pais_id
+    UNION
+    SELECT 'eolica', corr(p.eolica, e.media_anos_estudo) FROM Producoes p JOIN Educacao e ON p.pais_id = e.pais_id
+    UNION
+    SELECT 'gas', corr(p.gas, e.media_anos_estudo) FROM Producoes p JOIN Educacao e ON p.pais_id = e.pais_id
+    UNION
+    SELECT 'fossil', corr(p.fossil, e.media_anos_estudo) FROM Producoes p JOIN Educacao e ON p.pais_id = e.pais_id
+    UNION
+    SELECT 'hidro', corr(p.hidro, e.media_anos_estudo) FROM Producoes p JOIN Educacao e ON p.pais_id = e.pais_id
+    UNION
+    SELECT 'nuclear', corr(p.nuclear, e.media_anos_estudo) FROM Producoes p JOIN Educacao e ON p.pais_id = e.pais_id
+    ORDER BY correlacao DESC;
+    """
+    with conn.cursor() as cur:
+        cur.execute(query)
+        for row in cur.fetchall():
+            print(row)
+            
 args = argparse.ArgumentParser()
 args.add_argument(
     "--reset-schema",
@@ -395,3 +490,4 @@ if __name__ == "__main__":
                         highest_education_variation(conn)
                     case default:
                         print(f"Skipping unknown query: {query}")
+
