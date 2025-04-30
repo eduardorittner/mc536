@@ -52,6 +52,7 @@ Or using the pgAdmin4
 ![relacional_sql_post](https://github.com/user-attachments/assets/2e28d5e9-97f2-4852-93d5-5e9b67c5848f)
 
 ## Physical Model
+The physical model generated from pgAdmin4 can be found here physical_model.sql
 
 ## Database Schema
 
