@@ -63,3 +63,11 @@ At the center of the schema is the "Pais" table, which contains the unique list 
 The energy-related data is structured around the "Producao" table, which aggregates annual production metrics per country, broken down by energy source (e.g., wind, solar, coal). Each production entry points to multiple "Fonte" records, which combine information from both "Energia" (e.g., total production/consumption) and "Eletricidade" (e.g., electricity output and share). This modular design allows us to analyze both total energy trends and electricity-specific insights for each energy type.
 
 By connecting these domains through foreign keys, the schema enables complex queries that link education metrics with energy variables — such as identifying correlations between investment in renewables and increases in schooling, or ranking countries by energy consumption relative to their education levels.
+
+## Queries
+Five queries were developed to analyze each of the questions below:
+1. Sort countries by energy consumption and show their education level
+2. Sort countries by energy production and show their education level
+3. Rank countries that had the highest percentage increase in education and show their energy consumption/production
+4. Find the energy source that has the highest correlation with high education
+5. Rank countries according to renewable energy production and level of education
