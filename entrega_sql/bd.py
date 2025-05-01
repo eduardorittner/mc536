@@ -137,11 +137,11 @@ def import_education(file, conn):
 
             escolaridade_sql = """
             INSERT INTO "Escolaridade" ("porc_sem_escolaridade",
-            "porc_primario_alcançado",
+            "porc_primario_alcancado",
             "porc_primario_completo",
-            "porc_secundario_alcançado",
+            "porc_secundario_alcancado",
             "porc_secundario_completo",
-            "porc_superior_alcançado",
+            "porc_superior_alcancado",
             "porc_superior_completo",
             "populacao_id")
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
@@ -331,12 +331,13 @@ WHERE
   ea.total_nuclear IS NOT NULL
 ORDER BY ed.diferenca_media_estudo DESC;
     """
-    print("Running highest education variation query")
-
     with conn.cursor() as cur:
         cur.execute(sql)
-        for row in cur.fetchall():
-            print(row)
+        results = cur.fetchall()
+        colnames = [desc[0] for desc in cur.description]
+
+    df = pd.DataFrame(results, columns=colnames)
+    print(df)
 
 
 def consumo_educacao(conn):
@@ -362,8 +363,11 @@ def consumo_educacao(conn):
     """
     with conn.cursor() as cur:
         cur.execute(query)
-        for row in cur.fetchall():
-            print(row)
+        results = cur.fetchall()
+        colnames = [desc[0] for desc in cur.description]
+
+    df = pd.DataFrame(results, columns=colnames)
+    print(df)
 
 
 def producao_educacao(conn):
@@ -389,8 +393,11 @@ def producao_educacao(conn):
     """
     with conn.cursor() as cur:
         cur.execute(query)
-        for row in cur.fetchall():
-            print(row)
+        results = cur.fetchall()
+        colnames = [desc[0] for desc in cur.description]
+
+    df = pd.DataFrame(results, columns=colnames)
+    print(df)
 
 
 def correlacao_educacao_energia(conn):
@@ -434,43 +441,86 @@ def correlacao_educacao_energia(conn):
     """
     with conn.cursor() as cur:
         cur.execute(query)
-        for row in cur.fetchall():
-            print(row)
+        results = cur.fetchall()
+        colnames = [desc[0] for desc in cur.description]
+
+    df = pd.DataFrame(results, columns=colnames)
+    print(df)
 
 
 def education_disparity_energy(conn):
     query = """
-    WITH media_por_sexo AS (
-      SELECT
+    WITH producao_renovavel_por_ano AS (
+    SELECT 
         p.id AS pais_id,
         p.nome AS pais,
-        pop.sexo,
-        AVG(me.media_anos_estudo) AS media_anos_estudo
-      FROM "Pais" p
-      JOIN "Populacao" pop ON pop.pais_id = p.id
-      JOIN "Media_Estudo" me ON me.populacao_id = pop.id
-      WHERE pop.sexo IN ('M', 'F')
-      GROUP BY p.id, p.nome, pop.sexo
-    ),
-    disparidade AS (
-      SELECT
-        m1.pais,
-        ABS(m1.media_anos_estudo - m2.media_anos_estudo) AS disparidade_educacional
-      FROM media_por_sexo m1
-      JOIN media_por_sexo m2 ON m1.pais = m2.pais
-      WHERE m1.sexo = 'M' AND m2.sexo = 'F'
-    )
+        pr.ano,
+        COALESCE(pr.biocombustivel, 0) + 
+        COALESCE(pr.solar, 0) + 
+        COALESCE(pr.eolica, 0) + 
+        COALESCE(pr.hidro, 0) AS total_renovavel
+    FROM 
+        "Pais" p
+    JOIN 
+        "Producao" pr ON pr.pais_id = p.id
+    WHERE 
+        pr.ano BETWEEN 1980 AND 2010
+),
+media_producao_renovavel AS (
+    SELECT 
+        pais_id,
+        pais,
+        AVG(total_renovavel) AS media_producao_renovavel
+    FROM 
+        producao_renovavel_por_ano
+    GROUP BY 
+        pais_id, pais
+),
+ranking_producao_renovavel AS (
+    SELECT 
+        pais,
+        media_producao_renovavel,
+        RANK() OVER (ORDER BY media_producao_renovavel DESC) AS ranking_renovavel
+    FROM 
+        media_producao_renovavel
+),
+educacao_por_ano AS (
     SELECT
-      d.pais,
-      d.disparidade_educacional,
-      e.producao,
-      e.consumo
-    FROM disparidade d
-    JOIN "Pais" p ON p.nome = d.pais
-    LEFT JOIN "Producao" pr ON pr.pais_id = p.id
-    LEFT JOIN "Fonte" f ON f.id = pr.solar  -- substitua por outra fonte se necessário
-    LEFT JOIN "Energia" e ON e.id = f.energia
-    ORDER BY d.disparidade_educacional DESC;
+        p.id AS pais_id,
+        p.nome AS pais,
+        AVG(me.media_anos_estudo) AS media_anos_estudo
+    FROM 
+        "Populacao" pop
+    JOIN 
+        "Media_Estudo" me ON me.populacao_id = pop.id
+    JOIN 
+        "Pais" p ON p.id = pop.pais_id
+    WHERE 
+        pop.ano BETWEEN 1980 AND 2010
+    GROUP BY 
+        p.id, p.nome
+),
+ranking_educacao AS (
+    SELECT 
+        pais,
+        media_anos_estudo,
+        RANK() OVER (ORDER BY media_anos_estudo DESC) AS ranking_educacao
+    FROM 
+        educacao_por_ano
+)
+SELECT 
+    r1.pais,
+    r1.media_producao_renovavel,
+    r2.media_anos_estudo,
+    (r1.ranking_renovavel + r2.ranking_educacao) / 2.0 AS ranking_combinado
+FROM 
+    ranking_producao_renovavel r1
+JOIN 
+    ranking_educacao r2 ON r1.pais = r2.pais
+ORDER BY 
+    ranking_combinado;
+
+
     """
 
     with conn.cursor() as cur:
@@ -480,8 +530,6 @@ def education_disparity_energy(conn):
 
     df = pd.DataFrame(results, columns=colnames)
     print(df)
-    
-
 
 args = argparse.ArgumentParser()
 args.add_argument(
@@ -504,7 +552,7 @@ args.add_argument(
 )
 args.add_argument("--dbname", type=str, default="Educacao-e-energia")
 args.add_argument("--user", type=str, default="postgres")
-args.add_argument("--password", type=str, default="")
+args.add_argument("--password", type=str, default="Banco1")
 args.add_argument("--host", type=str, default="localhost")
 args.add_argument("--port", type=str, default="5432")
 
@@ -551,4 +599,3 @@ if opt.queries is not None:
                 education_disparity_energy(conn)
             case _:
                 print(f"Skipping unknown query: {query}")
-
