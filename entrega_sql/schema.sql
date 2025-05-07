@@ -15,11 +15,11 @@ CREATE TABLE "Populacao" (
 CREATE TABLE "Escolaridade" (
   "id" int GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   "porc_sem_escolaridade" numeric,
-  "porc_primario_alcançado" numeric,
+  "porc_primario_alcancado" numeric,
   "porc_primario_completo" numeric,
-  "porc_secundario_alcançado" numeric,
+  "porc_secundario_alcancado" numeric,
   "porc_secundario_completo" numeric,
-  "porc_superior_alcançado" numeric,
+  "porc_superior_alcancado" numeric,
   "porc_superior_completo" numeric,
   "populacao_id" int NOT NULL
 );
