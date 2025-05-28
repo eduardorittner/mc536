@@ -8,5 +8,6 @@ dependencies = [
     "argparse>=1.4.0",
     "pandas>=2.2.3",
     "psycopg2>=2.9.10",
+    "pymongo>=4.13.0",
     "tqdm>=4.67.1",
 ]
