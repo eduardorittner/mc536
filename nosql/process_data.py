@@ -1,12 +1,6 @@
-# This script takes as input both csv dataset files and outputs
-# json files which can be imported directly into mongodb
-# TODO: should we generate one json per document or one big json with all
-# documents
-
 import os
 import csv
 import json
-from pymongo import MongoClient
 
 ENERGY_DATASET_FILE = "energy.csv"
 EDUCATION_DATASET_FILE = "education.csv"
