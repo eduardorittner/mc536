@@ -7,7 +7,6 @@ import os
 import csv
 import json
 from pymongo import MongoClient
-from tqdm import tqdm
 
 ENERGY_DATASET_FILE = "energy.csv"
 EDUCATION_DATASET_FILE = "education.csv"
@@ -19,7 +18,7 @@ def process_energy(input_path, output_path):
     data = []
     with open(input_path, "r") as f:
         reader = csv.DictReader(f)
-        for row in tqdm(reader):
+        for row in reader:
             processed_row = {}
             for key, value in row.items():
                 match key:
@@ -62,7 +61,7 @@ def process_education(input_path, output_path):
     data = []
     with open(input_path, "r") as f:
         reader = csv.DictReader(f)
-        for row in tqdm(reader):
+        for row in reader:
             processed_row = {}
             for key, value in row.items():
                 match key:

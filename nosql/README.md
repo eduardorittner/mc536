@@ -1,5 +1,14 @@
 Para fazer o projeto, escolhemos utilizar o MongoDB.
 
+# Como rodar
+
+O script `process_data.py` processa os datasets originais (em .csv) e armazena-os como documentos .json, que são então importados para o banco (no mesmo script).
+Para executar as queries, rode o script `queries.py`.
+
+## Dependências
+
+As dependências para o script python estão especificadas no `pyproject.toml` e são `csv`, `json` e `pymongo`.
+
 # Justificativa da Escolha do Banco
 ## Forma de armazenamento de arquivos
 
