@@ -7,7 +7,7 @@ Para executar as queries, rode o script `queries.py`.
 
 ## Dependências
 
-As dependências para o script python estão especificadas no `pyproject.toml` e são `csv`, `json` e `pymongo`.
+As dependências para o script python estão especificadas tanto no `pyproject.toml` quanto no `requirements.txt` e são `csv`, `json` e `pymongo`.
 
 # Justificativa da Escolha do Banco
 ## Forma de armazenamento de arquivos
