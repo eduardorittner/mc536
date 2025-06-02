@@ -38,7 +38,6 @@ def process_energy(input_path, output_path):
 def process_education(input_path, output_path):
     # Map from the original dataset keys to our (more readable) keys
     renamed_keys = {
-        "pop": "population",
         "lu": "no_schooling",
         "lp": "primary_schooling",
         "lpc": "primary_schooling_complete",
@@ -68,6 +67,10 @@ def process_education(input_path, output_path):
                     # Int values without renaming
                     case "agefrom" | "ageto" | "year":
                         processed_row[key] = int(value)
+                    # Int value with renaming and changing
+                    case "pop":
+                        if value != "":
+                            processed_row["population"] = 1000 * int(value)
                     # Renamed float values
                     case _:
                         if value != "":
