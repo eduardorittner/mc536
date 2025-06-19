@@ -1,4 +1,189 @@
 from pymongo import MongoClient
+from enum import Enum
+
+
+class EducationIncreaseMetric(Enum):
+    AVG_SCHOOL_YEARS = "schooling_years_avg"
+    PRIMARY_COMPLETE = "primary_schooling_complete"
+    SECONDARY_COMPLETE = "secondary_schooling_complete"
+    TERTIARY_COMPLETE = "tertiary_schooling_complete"
+
+
+def rank_countries_by_education_increase(
+    db,
+    energy_collection_name,
+    education_collection_name,
+    # Note that education metric should be the string value
+    # So pass in enum.value
+    education_metric,
+    start_year,
+    end_year,
+    energy_metrics,
+):
+    education_collection = db[education_collection_name]
+
+    smol_pipeline = [
+        # Match on period
+        {
+            "$match": {
+                "year": {"$in": [start_year, end_year]},
+                "agefrom": 15,
+                "ageto": 999,
+            }
+        },
+        {
+            "$group": {
+                "_id": "$country",
+                "start_edu_value": {
+                    "$first": {
+                        "$cond": [
+                            {"$eq": ["$year", start_year]},
+                            f"${education_metric}",
+                            "$$REMOVE",  # If year doesn't match, don't include this field
+                        ]
+                    }
+                },
+                "end_edu_value": {
+                    "$first": {
+                        "$cond": [
+                            {"$eq": ["$year", end_year]},
+                            f"${education_metric}",
+                            "$$REMOVE",
+                        ]
+                    }
+                },
+            }
+        },
+    ]
+
+    pipeline = [
+        {
+            "$match": {
+                "year": {"$in": [start_year, end_year]},
+                "agefrom": 15,
+                "ageto": 999,
+            }
+        },
+        {
+            "$group": {
+                "_id": "$country",
+                "start_edu_value": {
+                    "$first": {
+                        "$cond": [
+                            {"$eq": ["$year", start_year]},
+                            f"${education_metric}",
+                            "$$REMOVE",  # If year doesn't match, don't include this field
+                        ]
+                    }
+                },
+                "end_edu_value": {
+                    "$first": {
+                        "$cond": [
+                            {"$eq": ["$year", end_year]},
+                            f"${education_metric}",
+                            "$$REMOVE",
+                        ]
+                    }
+                },
+            }
+        },
+        # Stage 3: Calculate percentage increase and handle missing/zero values
+        {
+            "$project": {
+                "_id": 0,
+                "country": "$_id",
+                "start_edu_value": 1,
+                "end_edu_value": 1,
+                "education_increase_pct": {
+                    "$cond": {
+                        "if": {
+                            "$and": [
+                                {"$ne": ["$start_edu_value", None]},
+                                {"$ne": ["$end_edu_value", None]},
+                                # Avoid division by zero
+                                {"$ne": ["$start_edu_value", 0]},
+                            ]
+                        },
+                        "then": {
+                            "$multiply": [
+                                {
+                                    "$divide": [
+                                        {
+                                            "$subtract": [
+                                                "$end_edu_value",
+                                                "$start_edu_value",
+                                            ]
+                                        },
+                                        "$start_edu_value",
+                                    ]
+                                },
+                                100,
+                            ]
+                        },
+                        "else": None,  # Set to None if data is missing or start_edu_value is 0
+                    }
+                },
+            }
+        },
+        # Stage 4: Filter out countries where education_increase_pct could not be calculated
+        {"$match": {"education_increase_pct": {"$ne": None}}},
+        # Stage 5: Join with energy data for the end_year
+        {
+            "$lookup": {
+                "from": energy_collection_name,
+                "localField": "country",
+                "foreignField": "country",
+                "as": "energy_data",
+                "pipeline": [
+                    {"$match": {"year": end_year}},
+                    {
+                        "$project": {
+                            "_id": 0,
+                            "year": 1,
+                            **{
+                                metric: 1 for metric in energy_metrics
+                            },  # Dynamically project requested energy metrics
+                        }
+                    },
+                ],
+            }
+        },
+        # Stage 6: Unwind energy_data array (assuming one energy doc per country per year)
+        # If a country has no energy data for end_year, it will be filtered out here.
+        {"$unwind": "$energy_data"},
+        # Stage 7: Sort by education_increase_pct in descending order
+        {"$sort": {"education_increase_pct": -1}},
+        # Stage 8: Final projection to shape the output
+        {
+            "$project": {
+                "_id": 0,
+                "country": 1,
+                "education_increase_pct": 1,
+                "end_year_energy_data": "$energy_data",  # Nest energy data for clarity
+            }
+        },
+    ]
+
+    results = list(education_collection.aggregate(pipeline))
+    print(list(education_collection.aggregate(smol_pipeline)))
+
+    print(
+        f"Ranking Countries by Highest Percentage Increase in '{education_metric}' ({start_year}-{end_year}):"
+    )
+    print("-" * 80)
+    for i, doc in enumerate(results):
+        print(f"Rank {i + 1}. Country: {doc.get('country')}")
+        print(
+            f"   Education Increase (%): {doc.get('education_increase_pct', 'N/A'):.2f}%"
+        )
+        energy_info = doc.get("end_year_energy_data", {})
+        print(f"   Energy Data ({end_year}):")
+        for metric in energy_metrics:
+            value = energy_info.get(metric, "N/A")
+            if isinstance(value, (int, float)):
+                print(f"     {metric.replace('_', ' ').title()}: {value:,.2f}")
+            else:
+                print(f"     {metric.replace('_', ' ').title()}: {value}")
 
 
 def sort_countries_by_energy_and_education(
@@ -95,4 +280,13 @@ def sort_countries_by_energy_and_education(
 uri = "mongodb://localhost:27017/"
 client = MongoClient(uri)
 db = client["education_and_energy"]
-sort_countries_by_energy_and_education(db, "energy", "education", year=2010)
+# sort_countries_by_energy_and_education(db, "energy", "education", year=2010)
+rank_countries_by_education_increase(
+    db,
+    "energy",
+    "education",
+    EducationIncreaseMetric.AVG_SCHOOL_YEARS.value,
+    1990,
+    1995,
+    ["energy_per_capita"],
+)
