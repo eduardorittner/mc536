@@ -552,7 +552,7 @@ args.add_argument(
 )
 args.add_argument("--dbname", type=str, default="Educacao-e-energia")
 args.add_argument("--user", type=str, default="postgres")
-args.add_argument("--password", type=str, default="Banco1")
+args.add_argument("--password", type=str, default="")
 args.add_argument("--host", type=str, default="localhost")
 args.add_argument("--port", type=str, default="5432")
 
