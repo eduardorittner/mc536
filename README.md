@@ -68,6 +68,6 @@ By connecting these domains through foreign keys, the schema enables complex que
 Five queries were developed to analyze each of the questions below:
 1. Sort countries by energy consumption and show their education level
 2. Sort countries by energy production and show their education level
-3. Rank countries that had the highest percentage increase in education and show their energy consumption/production
+3. Rank countries that had the highest percentage increase in completion of secondary education and show their energy production
 4. Find the energy source that has the highest correlation with high education
 5. Rank countries according to renewable energy production and level of education
