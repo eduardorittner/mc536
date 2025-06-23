@@ -19,75 +19,49 @@ def rank_countries_by_education_increase(
     start_year,
     end_year,
     energy_metrics,
+    n_matches,
 ):
     education_collection = db[education_collection_name]
 
-    smol_pipeline = [
-        # Match on period
-        {
-            "$match": {
-                "year": {"$in": [start_year, end_year]},
-                "agefrom": 15,
-                "ageto": 999,
-            }
-        },
-        {
-            "$group": {
-                "_id": "$country",
-                "start_edu_value": {
-                    "$first": {
-                        "$cond": [
-                            {"$eq": ["$year", start_year]},
-                            f"${education_metric}",
-                            "$$REMOVE",  # If year doesn't match, don't include this field
-                        ]
-                    }
-                },
-                "end_edu_value": {
-                    "$first": {
-                        "$cond": [
-                            {"$eq": ["$year", end_year]},
-                            f"${education_metric}",
-                            "$$REMOVE",
-                        ]
-                    }
-                },
-            }
-        },
-    ]
+    energy_projection = {"_id": 0, "year": 1}
+    for metric in energy_metrics:
+        energy_projection[metric] = 1
 
     pipeline = [
+        # Match on start and end years
         {
             "$match": {
                 "year": {"$in": [start_year, end_year]},
+                # Get information for the entire population
                 "agefrom": 15,
                 "ageto": 999,
             }
         },
+        # Group by country and get the education metrics for start/end years
         {
             "$group": {
                 "_id": "$country",
                 "start_edu_value": {
-                    "$first": {
+                    "$max": {
                         "$cond": [
                             {"$eq": ["$year", start_year]},
                             f"${education_metric}",
-                            "$$REMOVE",  # If year doesn't match, don't include this field
+                            None,
                         ]
                     }
                 },
                 "end_edu_value": {
-                    "$first": {
+                    "$max": {
                         "$cond": [
                             {"$eq": ["$year", end_year]},
                             f"${education_metric}",
-                            "$$REMOVE",
+                            None,
                         ]
                     }
                 },
             }
         },
-        # Stage 3: Calculate percentage increase and handle missing/zero values
+        # Calculate percentage increase and handle missing/zero values
         {
             "$project": {
                 "_id": 0,
@@ -95,16 +69,15 @@ def rank_countries_by_education_increase(
                 "start_edu_value": 1,
                 "end_edu_value": 1,
                 "education_increase_pct": {
-                    "$cond": {
-                        "if": {
+                    "$cond": [
+                        {
                             "$and": [
                                 {"$ne": ["$start_edu_value", None]},
                                 {"$ne": ["$end_edu_value", None]},
-                                # Avoid division by zero
                                 {"$ne": ["$start_edu_value", 0]},
                             ]
                         },
-                        "then": {
+                        {
                             "$multiply": [
                                 {
                                     "$divide": [
@@ -120,14 +93,14 @@ def rank_countries_by_education_increase(
                                 100,
                             ]
                         },
-                        "else": None,  # Set to None if data is missing or start_edu_value is 0
-                    }
+                        None,
+                    ]
                 },
             }
         },
-        # Stage 4: Filter out countries where education_increase_pct could not be calculated
+        # Filter out countries where education_increase_pct could not be calculated
         {"$match": {"education_increase_pct": {"$ne": None}}},
-        # Stage 5: Join with energy data for the end_year
+        # Join with energy data for the start_year
         {
             "$lookup": {
                 "from": energy_collection_name,
@@ -137,23 +110,17 @@ def rank_countries_by_education_increase(
                 "pipeline": [
                     {"$match": {"year": end_year}},
                     {
-                        "$project": {
-                            "_id": 0,
-                            "year": 1,
-                            **{
-                                metric: 1 for metric in energy_metrics
-                            },  # Dynamically project requested energy metrics
-                        }
+                        "$project": energy_projection,
                     },
                 ],
             }
         },
-        # Stage 6: Unwind energy_data array (assuming one energy doc per country per year)
-        # If a country has no energy data for end_year, it will be filtered out here.
+        # Unwind energy_data array, if a country has no energy data for end_year, it will be filtered out here.
         {"$unwind": "$energy_data"},
-        # Stage 7: Sort by education_increase_pct in descending order
         {"$sort": {"education_increase_pct": -1}},
-        # Stage 8: Final projection to shape the output
+        # Limit to at most n_matches
+        {"$limit": n_matches},
+        # Final projection to shape the output
         {
             "$project": {
                 "_id": 0,
@@ -165,7 +132,6 @@ def rank_countries_by_education_increase(
     ]
 
     results = list(education_collection.aggregate(pipeline))
-    print(list(education_collection.aggregate(smol_pipeline)))
 
     print(
         f"Ranking Countries by Highest Percentage Increase in '{education_metric}' ({start_year}-{end_year}):"
@@ -288,5 +254,6 @@ rank_countries_by_education_increase(
     EducationIncreaseMetric.AVG_SCHOOL_YEARS.value,
     1990,
     1995,
-    ["energy_per_capita"],
+    ["energy_per_capita", "oil_electricity"],
+    10,
 )
