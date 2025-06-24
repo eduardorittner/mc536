@@ -55,7 +55,7 @@ Or using the pgAdmin4
 
 
 ## Physical Model
-The physical model generated from pgAdmin4 can be found on this [link](https://github.com/eduardorittner/mc536/blob/e4bdc35b00eecf56b7e85c2c8202361530a86b18/entrega_sql/schema.sql)
+The physical model generated from pgAdmin4 can be found on this [link](https://github.com/eduardorittner/mc536/blob/main/entrega_sql/schema.sql)
 
 ## Database Schema
 
