@@ -70,7 +70,7 @@ Five queries were developed to analyze each of the questions below:
 2. Sort countries by energy production and show their education level
 3. Rank countries that had the highest percentage increase in completion of secondary education and show their energy production
 4. Find the energy source that has the highest Pearson coefficient with tertiary education
-5. Rank countries according to lowest "Ecological Footprint per capita"((fossil_production + fossil_consumption) - (renowable_production +renowable_consumption) / population)
+5. Countries currently(2010) ranked by lowest "Ecological Footprint per capita"((fossil_production + fossil_consumption) - (renowable_production +renowable_consumption) / population)
 
 ## Results
 Results of the queries:
@@ -78,4 +78,4 @@ Results of the queries:
 2.
 3. By subtracting the values of the percentage of complete secondary schooling over a 15-year interval, we were able to identify the countries with the greatest variation in education from 1965 to 2010, and also show their variation in energy production.
 4. Using the Pearson correlation to analyze the relationship between the average years of tertiary schooling attained and energy source production, we found that nuclear energy has the highest Pearson coefficient with higher education. This makes sense, as nuclear energy production requires high levels of technology. However, the coefficient still indicates only a weak correlation
-5. Using this arbitrary equation to try to measure the ecological footprint, we found that the Scandinavian countries have the smallest footprints, while Arab countries that are major producers of oil and gas have the largest ecological footprints. This aligns with common knowledge.
+5. Using this arbitrary equation to try to measure the ecological footprint, we found that the Scandinavian countries have the smallest footprints, while Arab countries that are major producers of oil and gas have the largest ecological footprints. This aligns with common knowledge. We believe this query is only relevant if we use the most recent data available, which is from 2010.
