@@ -39,17 +39,20 @@ The connection parameters can be configured via cli arguments as well:
 
 This conceptual model represents data on demographics, education, and energy production by country and year. Each country has multiple populations, and each population—defined by year, gender, age group, and size—is linked to a country and may include associated educational attainment percentages and average years of study. Energy production data is recorded by year and country, including various sources such as solar, wind, gas, hydro, and nuclear. These sources are represented in the “Fonte” entity, which connects each energy type to its corresponding energy and electricity data, including production, consumption, and annual variation. The model ensures that every population is tied to a specific country, and every production entry is connected to a country and optionally to energy and electricity records through sources.
 
-![conceitual](https://github.com/user-attachments/assets/e9b86bf9-4de0-4f5a-836a-334b4b4ba3be)
+![conceitual](https://github.com/user-attachments/assets/0bc0386f-f7c0-4131-a2a9-8e4c9b9eabe4)
+
 
 ## Relational Model
 
 The relational model reflects a normalized and modular structure that captures the connection between countries, their population demographics, education indicators, and energy production metrics. At its core, each country (Pais) is linked to multiple population groups (Populacao), segmented by year, sex, and age range. Each population group can then be analyzed educationally via two tables: Media_Estudo, which stores average years of schooling, and Escolaridade, which contains detailed percentages of educational attainment. On the energy side, each country and year combination in Producao references multiple energy sources, each of which connects to a Fonte—a bridge to both Energia (production/consumption data) and Eletricidade (electricity-specific data). This structure ensures analytical flexibility, enabling queries that associate energy profiles with educational development across time and geography.
 
-![Relacional](https://github.com/user-attachments/assets/77e408ee-99a6-4d06-b826-5374cfd8c4d7)
+![Relacional](https://github.com/user-attachments/assets/0e2407e8-920c-4f39-a477-83b4779e180e)
+
 
 Or using the pgAdmin4
 
-![relacional_sql_post](https://github.com/user-attachments/assets/2e28d5e9-97f2-4852-93d5-5e9b67c5848f)
+![relacional_sql_post](https://github.com/user-attachments/assets/39289697-6026-444a-b16a-f289609186c3)
+
 
 ## Physical Model
 The physical model generated from pgAdmin4 can be found on this [link](https://github.com/eduardorittner/mc536/blob/e4bdc35b00eecf56b7e85c2c8202361530a86b18/entrega_sql/schema.sql)
