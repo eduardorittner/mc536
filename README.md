@@ -22,7 +22,7 @@ All the functionality is in db.py and is gated behind command-line flags. For a 
 - `--energy`: Reload only the energy dataset.
 - `--education`: Reload only the education dataset.
 - `--queries`: Comma-delimited list of queries. For all queries use `--queries all`. In the energy database we modified some of the countries names(United States to USA and Vietnam ti Viet Nam). Most of the queries used data between 1965 and 2010, because that was the interval that matched between the two databases. The list of available queries is:
-    - "highest_education_variation"
+    - "education-variation"
     - "consumo-educacao"
     - "producao-educacao"
     - "correlacao_educacao_energia"
