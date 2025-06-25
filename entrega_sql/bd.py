@@ -10,13 +10,11 @@ def erase_tables(conn):
         try:
             # Drop tables in reverse dependency order
             drop_order = [
-                "Producao",
                 "Media_Estudo",
                 "Escolaridade",
                 "Populacao",
-                "Fonte",
+                "Tipo_Eletricidade",
                 "Eletricidade",
-                "Energia",
                 "Pais",
             ]
 
@@ -172,164 +170,132 @@ def import_education(file, conn):
         conn.commit()
 
 
-def import_energy(file, conn):
-    df = pd.read_csv(file)
-
-    # Unique list of all countries
-    countries = df["country"].drop_duplicates()
-    country_ids = insert_countries(countries, conn)
-
-    # TODO add oil to .sql schema and here
+def insert_energy_types(conn):
+    """
+    Insere os tipos de eletricidade na tabela Tipo_Eletricidade se ainda não estiverem cadastrados.
+    """
     energy_types = [
-        "biofuel",
         "coal",
         "solar",
         "wind",
         "gas",
-        "fossil_fuel",
         "hydro",
         "nuclear",
+        "oil",
+        "other_renewable"
     ]
 
-    energy_keys = ["consumption", "production", "prod_change_twh", "cons_change_twh"]
+    with conn.cursor() as cur:
+        cur.execute('SELECT "id", "tipo" FROM "Tipo_Eletricidade"')
+        existing = dict(cur.fetchall())
 
-    electricity_keys = ["electricity", "share_elec"]
+        type_ids = {}
+        id_counter = max(existing.keys(), default=0) + 1
 
-    print("Importing energy dataset")
+        for energy in energy_types:
+            if energy not in existing.values():
+                cur.execute(
+                    'INSERT INTO "Tipo_Eletricidade" ("id", "tipo") VALUES (%s, %s) RETURNING "id"',
+                    (id_counter, energy)
+                )
+                type_id = cur.fetchone()[0]
+                type_ids[energy] = type_id
+                id_counter += 1
+            else:
+                # Recupera o id já existente
+                type_id = [k for k, v in existing.items() if v == energy][0]
+                type_ids[energy] = type_id
+
+        conn.commit()
+        return type_ids
+
+
+def import_energy(file, conn):
+    df = pd.read_csv(file)
+
+    # Lista única de países
+    countries = df["country"].drop_duplicates()
+    country_ids = insert_countries(countries, conn)
+
+    # Inserir tipos de energia
+    type_ids = insert_energy_types(conn)
+
+    print("Importando energia para a tabela Eletricidade...")
     with conn.cursor() as cur:
         for _, row in tqdm(df.iterrows(), total=len(df), colour="green"):
             year = row["year"]
             country = country_ids[row["country"]]
 
-            producao = [year, country]
+            for energy in type_ids.keys():
+                tipo_id = type_ids[energy]
 
-            energia_sql = """
-            INSERT INTO "Energia" ("producao", "consumo", "mudanca_anual_consumo", "mudanca_anual_producao")
-            VALUES (%s, %s, %s, %s)
-            RETURNING "id" """
+                producao = row.get(f"{energy}_electricity")
+                consumo = row.get(f"{energy}_consumption")
 
-            eletricidade_sql = """
-            INSERT INTO "Eletricidade" ("producao", "porcentagem")
-            VALUES (%s, %s)
-            RETURNING "id" """
+                 # Transforma 0.000 e NaN em 0
+                producao = 0 if pd.isna(producao) or producao == 0.0 else producao
+                consumo = 0 if pd.isna(consumo) or consumo == 0.0 else consumo
 
-            fonte_sql = """
-            INSERT INTO "Fonte" ("energia", "eletricidade")
-            VALUES (%s, %s)
-            RETURNING "id" """
+                # Se ambos forem zero (sem dados reais), pula
+                if producao == 0 and consumo == 0:
+                    continue
 
-            producao_sql = """
-            INSERT INTO "Producao" ("ano", "pais_id", "biocombustivel", "carvao", "solar", "eolica", "gas", "combustivel_fossil", "hidro", "nuclear")
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            RETURNING "id" """
+                cur.execute(
+                    """
+                    INSERT INTO "Eletricidade" (
+                    "ano", "pais_id", "tipo_eletricidade_id", "producao", "consumo"
+                    ) VALUES (%s, %s, %s, %s, %s)
+                    """,
+                    (year, country, tipo_id, producao, consumo)
+                )
 
-            for energy in energy_types:
-                values = [row.get(energy + "_" + b) for b in energy_keys]
-                cur.execute(energia_sql, (values))
-                energia_id = cur.fetchone()[0]
-
-                # NOTE we use `get` here because it can be null
-                values = [row.get(energy + "_" + b) for b in electricity_keys]
-                cur.execute(eletricidade_sql, (values))
-                eletricidade_id = cur.fetchone()[0]
-
-                # Create fonte table
-                cur.execute(fonte_sql, (energia_id, eletricidade_id))
-                fonte_id = cur.fetchone()[0]
-
-                producao.append(fonte_id)
-
-            cur.execute(producao_sql, (producao))
 
         conn.commit()
 
 
 def highest_education_variation(conn):
     sql = """
-    WITH Media2000 AS (
-  SELECT 
-    pop.pais_id,
-    AVG(me.media_anos_estudo) AS media_inicial
-  FROM "Media_Estudo" me
-  JOIN "Populacao" pop ON me.populacao_id = pop.id
-  WHERE pop.ano = 2000
-  GROUP BY pop.pais_id
-),
-Media2010 AS (
-  SELECT 
-    pop.pais_id,
-    AVG(me.media_anos_estudo) AS media_final
-  FROM "Media_Estudo" me
-  JOIN "Populacao" pop ON me.populacao_id = pop.id
-  WHERE pop.ano = 2010
-  GROUP BY pop.pais_id
-),
-EducationData AS (
-  SELECT 
-    m2000.pais_id,
-    m2000.media_inicial,
-    m2010.media_final
-  FROM Media2000 m2000
-  JOIN Media2010 m2010 
-    ON m2000.pais_id = m2010.pais_id
-),
-EducationDifference AS (
-  SELECT 
-    edata.pais_id,
-    edata.media_inicial,
-    edata.media_final,
-    (edata.media_final - edata.media_inicial) AS diferenca_media_estudo
-  FROM EducationData edata
-  WHERE edata.media_inicial IS NOT NULL AND edata.media_final IS NOT NULL
-),
-EnergyAggregated AS (
-  SELECT 
-    p.pais_id,
-    SUM(e1.producao) AS total_biocombustivel,
-    SUM(e2.producao) AS total_carvao,
-    SUM(e3.producao) AS total_solar,
-    SUM(e4.producao) AS total_eolica,
-    SUM(e5.producao) AS total_gas,
-    SUM(e6.producao) AS total_combustivel_fossil,
-    SUM(e7.producao) AS total_hidro,
-    SUM(e8.producao) AS total_nuclear
-  FROM "Producao" p
-  LEFT JOIN "Energia" e1 ON p.biocombustivel = e1.id
-  LEFT JOIN "Energia" e2 ON p.carvao = e2.id
-  LEFT JOIN "Energia" e3 ON p.solar = e3.id
-  LEFT JOIN "Energia" e4 ON p.eolica = e4.id
-  LEFT JOIN "Energia" e5 ON p.gas = e5.id
-  LEFT JOIN "Energia" e6 ON p.combustivel_fossil = e6.id
-  LEFT JOIN "Eletricidade" e7 ON p.hidro = e7.id
-  LEFT JOIN "Eletricidade" e8 ON p.nuclear = e8.id
-  WHERE p.ano BETWEEN 1970 AND 2010
-  GROUP BY p.pais_id
-)
-SELECT 
-  pais.nome AS pais,
-  ed.diferenca_media_estudo,
-  ea.total_biocombustivel,
-  ea.total_carvao,
-  ea.total_solar,
-  ea.total_eolica,
-  ea.total_gas,
-  ea.total_combustivel_fossil,
-  ea.total_hidro,
-  ea.total_nuclear
-FROM EducationDifference ed
-JOIN "Pais" pais ON ed.pais_id = pais.id
-JOIN EnergyAggregated ea ON ed.pais_id = ea.pais_id
-WHERE 
-  ed.diferenca_media_estudo IS NOT NULL AND
-  ea.total_biocombustivel IS NOT NULL AND
-  ea.total_carvao IS NOT NULL AND
-  ea.total_solar IS NOT NULL AND
-  ea.total_eolica IS NOT NULL AND
-  ea.total_gas IS NOT NULL AND
-  ea.total_combustivel_fossil IS NOT NULL AND
-  ea.total_hidro IS NOT NULL AND
-  ea.total_nuclear IS NOT NULL
-ORDER BY ed.diferenca_media_estudo DESC;
+    SELECT 
+    pa."nome" AS pais,
+
+    -- Soma todos os valores não-nulos, incluindo 0.000
+    COALESCE(SUM(el."consumo"), 0) AS consumo_total_eletricidade,
+
+    -- Média dos anos de estudo
+    ROUND(AVG(me."media_anos_estudo"), 2) AS media_anos_estudo,
+    ROUND(AVG(me."media_anos_primario"), 2) AS media_anos_primario,
+    ROUND(AVG(me."media_anos_secundario"), 2) AS media_anos_secundario,
+    ROUND(AVG(me."media_anos_superior"), 2) AS media_anos_superior
+
+FROM 
+    "Pais" pa
+
+JOIN "Eletricidade" el 
+    ON el."pais_id" = pa."id"
+
+LEFT JOIN "Populacao" p 
+    ON p."pais_id" = pa."id" AND p."ano" = el."ano"
+
+LEFT JOIN "Media_Estudo" me 
+    ON me."populacao_id" = p."id"
+
+-- Filtro de ano ele mostra os dados de 1965 até 2010 pulando de 5 em 5
+
+
+GROUP BY 
+    pa."nome"
+
+HAVING 
+    SUM(el."consumo") > 0 -- Apenas ignora países com 100% dos dados de consumo nulos
+    AND COUNT(me."id") > 0
+    AND AVG(me."media_anos_estudo") IS NOT NULL
+    AND AVG(me."media_anos_primario") IS NOT NULL
+    AND AVG(me."media_anos_secundario") IS NOT NULL
+    AND AVG(me."media_anos_superior") IS NOT NULL
+	
+
+ORDER BY 
+    consumo_total_eletricidade DESC;
     """
     with conn.cursor() as cur:
         cur.execute(sql)
@@ -342,24 +308,23 @@ ORDER BY ed.diferenca_media_estudo DESC;
 
 def consumo_educacao(conn):
     query = """
-    WITH MediaEducacao AS (
-      SELECT pop.pais_id, me.media_anos_estudo
-      FROM "Populacao" pop
-      JOIN "Media_Estudo" me ON pop.id = me.populacao_id
-      WHERE pop.ano = 2010
-    ),
-    ConsumoEnergia AS (
-      SELECT pr.pais_id, SUM(e.producao) AS producao_total, SUM(e.consumo) AS consumo_total
-      FROM "Producao" pr
-      JOIN "Fonte" f ON f.id = ANY (ARRAY[pr.biocombustivel, pr.carvao, pr.solar, pr.eolica, pr.gas, pr.combustivel_fossil, pr.hidro, pr.nuclear])
-      JOIN "Energia" e ON f.energia = e.id
-      GROUP BY pr.pais_id
-    )
-    SELECT p.nome, ce.consumo_total, me.media_anos_estudo
-    FROM ConsumoEnergia ce
-    JOIN "Pais" p ON p.id = ce.pais_id
-    LEFT JOIN MediaEducacao me ON me.pais_id = ce.pais_id
-    ORDER BY ce.consumo_total DESC;
+SELECT
+  p."faixa_etaria",
+  e."porc_sem_escolaridade",
+  e."porc_primario_alcancado",
+  e."porc_primario_completo",
+  e."porc_secundario_alcancado",
+  e."porc_secundario_completo",
+  e."porc_superior_alcancado",
+  e."porc_superior_completo",
+  m."media_anos_estudo"
+FROM "Escolaridade" e
+JOIN "Populacao" p ON p."id" = e."populacao_id"
+JOIN "Media_Estudo" m ON m."populacao_id" = p."id"
+JOIN "Pais" pa ON pa."id" = p."pais_id"
+WHERE p."ano" = 2010
+  AND pa."nome" = 'Brazil'
+ORDER BY m."media_anos_estudo" DESC;
     """
     with conn.cursor() as cur:
         cur.execute(query)
@@ -371,25 +336,79 @@ def consumo_educacao(conn):
 
 
 def producao_educacao(conn):
-    query = """
-    WITH MediaEducacao AS (
-      SELECT pop.pais_id, me.media_anos_estudo
-      FROM "Populacao" pop
-      JOIN "Media_Estudo" me ON pop.id = me.populacao_id
-      WHERE pop.ano = 2010
-    ),
-    ProducaoEnergia AS (
-      SELECT pr.pais_id, SUM(e.producao) AS producao_total
-      FROM "Producao" pr
-      JOIN "Fonte" f ON f.id = ANY (ARRAY[pr.biocombustivel, pr.carvao, pr.solar, pr.eolica, pr.gas, pr.combustivel_fossil, pr.hidro, pr.nuclear])
-      JOIN "Energia" e ON f.energia = e.id
-      GROUP BY pr.pais_id
-    )
-    SELECT p.nome, pe.producao_total, me.media_anos_estudo
-    FROM ProducaoEnergia pe
-    JOIN "Pais" p ON p.id = pe.pais_id
-    LEFT JOIN MediaEducacao me ON me.pais_id = pe.pais_id
-    ORDER BY pe.producao_total DESC;
+    query = """WITH escolaridade_base AS (
+    SELECT
+        pa."nome" AS pais,
+        p."ano",
+        AVG(es."porc_secundario_completo") AS secundario_completo
+    FROM "Pais" pa
+    JOIN "Populacao" p ON p."pais_id" = pa."id"
+    JOIN "Escolaridade" es ON es."populacao_id" = p."id"
+    WHERE p."ano" IN (1965, 1980, 1995, 2010)
+      AND p."faixa_etaria" = '15_999'
+    GROUP BY pa."nome", p."ano"
+),
+
+energia_base AS (
+    SELECT
+        pa."nome" AS pais,
+        e."ano",
+        SUM(COALESCE(e."producao", 0)) AS producao_total
+    FROM "Pais" pa
+    JOIN "Eletricidade" e ON e."pais_id" = pa."id"
+    WHERE e."ano" IN (1965, 1980, 1995, 2010)
+    GROUP BY pa."nome", e."ano"
+),
+
+escolaridade_pares AS (
+    SELECT
+        e1.pais,
+        e1.ano AS ano_inicial,
+        e2.ano AS ano_final,
+        ROUND(e2.secundario_completo - e1.secundario_completo, 2) AS variacao_secundario_completo
+    FROM escolaridade_base e1
+    JOIN escolaridade_base e2 
+        ON e1.pais = e2.pais AND e2.ano = e1.ano + 15
+),
+
+energia_pares AS (
+    SELECT
+        e1.pais,
+        e1.ano AS ano_inicial,
+        e2.ano AS ano_final,
+        ROUND(e2.producao_total - e1.producao_total, 2) AS variacao_producao
+    FROM energia_base e1
+    JOIN energia_base e2 
+        ON e1.pais = e2.pais AND e2.ano = e1.ano + 15
+),
+
+combinado AS (
+    SELECT
+        e.ano_inicial,
+        e.ano_final,
+        e.pais,
+        e.variacao_secundario_completo,
+        ep.variacao_producao
+    FROM escolaridade_pares e
+    LEFT JOIN energia_pares ep
+        ON e.pais = ep.pais AND e.ano_inicial = ep.ano_inicial
+),
+
+ranked AS (
+    SELECT *,
+           RANK() OVER (PARTITION BY ano_inicial ORDER BY ABS(variacao_secundario_completo) DESC) AS rk
+    FROM combinado
+)
+
+SELECT 
+    ano_inicial,
+    ano_final,
+    pais,
+    variacao_secundario_completo,
+    variacao_producao
+FROM ranked
+WHERE rk = 1
+ORDER BY ano_inicial;
     """
     with conn.cursor() as cur:
         cur.execute(query)
@@ -402,42 +421,19 @@ def producao_educacao(conn):
 
 def correlacao_educacao_energia(conn):
     query = """
-    WITH Educacao AS (
-      SELECT pop.pais_id, me.media_anos_estudo
-      FROM "Populacao" pop
-      JOIN "Media_Estudo" me ON pop.id = me.populacao_id
-      WHERE pop.ano = 2010
-    ),
-    Producoes AS (
-      SELECT pais_id, 
-        SUM(biocombustivel) AS bio,
-        SUM(carvao) AS carvao,
-        SUM(solar) AS solar,
-        SUM(eolica) AS eolica,
-        SUM(gas) AS gas,
-        SUM(combustivel_fossil) AS fossil,
-        SUM(hidro) AS hidro,
-        SUM(nuclear) AS nuclear
-      FROM "Producao"
-      GROUP BY pais_id
-    )
-    SELECT
-      'bio' AS fonte, corr(p.bio, e.media_anos_estudo) AS correlacao FROM Producoes p JOIN Educacao e ON p.pais_id = e.pais_id
-    UNION
-    SELECT 'carvao', corr(p.carvao, e.media_anos_estudo) FROM Producoes p JOIN Educacao e ON p.pais_id = e.pais_id
-    UNION
-    SELECT 'solar', corr(p.solar, e.media_anos_estudo) FROM Producoes p JOIN Educacao e ON p.pais_id = e.pais_id
-    UNION
-    SELECT 'eolica', corr(p.eolica, e.media_anos_estudo) FROM Producoes p JOIN Educacao e ON p.pais_id = e.pais_id
-    UNION
-    SELECT 'gas', corr(p.gas, e.media_anos_estudo) FROM Producoes p JOIN Educacao e ON p.pais_id = e.pais_id
-    UNION
-    SELECT 'fossil', corr(p.fossil, e.media_anos_estudo) FROM Producoes p JOIN Educacao e ON p.pais_id = e.pais_id
-    UNION
-    SELECT 'hidro', corr(p.hidro, e.media_anos_estudo) FROM Producoes p JOIN Educacao e ON p.pais_id = e.pais_id
-    UNION
-    SELECT 'nuclear', corr(p.nuclear, e.media_anos_estudo) FROM Producoes p JOIN Educacao e ON p.pais_id = e.pais_id
-    ORDER BY correlacao DESC;
+    SELECT 
+    te."tipo" AS tipo_energia,
+    CORR(e."producao", es."media_anos_superior") AS correlacao_superior
+FROM "Eletricidade" e
+JOIN "Tipo_Eletricidade" te ON e."tipo_eletricidade_id" = te."id"
+JOIN "Pais" pa ON pa."id" = e."pais_id"
+JOIN "Populacao" p ON p."pais_id" = pa."id" AND p."ano" = e."ano"
+JOIN "Media_Estudo" es ON es."populacao_id" = p."id"
+WHERE 
+    es."media_anos_superior" IS NOT NULL
+    AND e."producao" IS NOT NULL
+GROUP BY te."tipo"
+ORDER BY correlacao_superior DESC;  
     """
     with conn.cursor() as cur:
         cur.execute(query)
@@ -450,75 +446,79 @@ def correlacao_educacao_energia(conn):
 
 def education_disparity_energy(conn):
     query = """
-    WITH producao_renovavel_por_ano AS (
+WITH tipo_categoria AS (
     SELECT 
-        p.id AS pais_id,
-        p.nome AS pais,
-        pr.ano,
-        COALESCE(pr.biocombustivel, 0) + 
-        COALESCE(pr.solar, 0) + 
-        COALESCE(pr.eolica, 0) + 
-        COALESCE(pr.hidro, 0) AS total_renovavel
-    FROM 
-        "Pais" p
-    JOIN 
-        "Producao" pr ON pr.pais_id = p.id
-    WHERE 
-        pr.ano BETWEEN 1980 AND 2010
+        id,
+        tipo,
+        CASE 
+            WHEN tipo IN ('coal', 'oil', 'gas') THEN 'fossil'
+            WHEN tipo IN ('nuclear', 'wind', 'solar', 'other_renewable', 'hydro') THEN 'renewable'
+            ELSE 'outros'
+        END AS categoria
+    FROM "Tipo_Eletricidade"
 ),
-media_producao_renovavel AS (
-    SELECT 
+
+energia_base AS (
+    SELECT
+        pa."id" AS pais_id,
+        pa."nome" AS pais,
+        te."tipo",
+        te."categoria",
+        SUM(COALESCE(e."producao", 0) + COALESCE(e."consumo", 0)) AS total_energia
+    FROM "Eletricidade" e
+    JOIN tipo_categoria te ON te.id = e."tipo_eletricidade_id"
+    JOIN "Pais" pa ON pa."id" = e."pais_id"
+    WHERE e."ano" = 2010
+    GROUP BY pa."id", pa."nome", te."tipo", te."categoria"
+),
+
+energia_pivot AS (
+    SELECT
         pais_id,
         pais,
-        AVG(total_renovavel) AS media_producao_renovavel
-    FROM 
-        producao_renovavel_por_ano
-    GROUP BY 
-        pais_id, pais
+        MAX(CASE WHEN tipo = 'coal' THEN total_energia ELSE 0 END) AS coal,
+        MAX(CASE WHEN tipo = 'oil' THEN total_energia ELSE 0 END) AS oil,
+        MAX(CASE WHEN tipo = 'gas' THEN total_energia ELSE 0 END) AS gas,
+        MAX(CASE WHEN tipo = 'nuclear' THEN total_energia ELSE 0 END) AS nuclear,
+        MAX(CASE WHEN tipo = 'wind' THEN total_energia ELSE 0 END) AS wind,
+        MAX(CASE WHEN tipo = 'solar' THEN total_energia ELSE 0 END) AS solar,
+        MAX(CASE WHEN tipo = 'hydro' THEN total_energia ELSE 0 END) AS hydro,
+        MAX(CASE WHEN tipo = 'other_renewable' THEN total_energia ELSE 0 END) AS other_renewable,
+        SUM(CASE WHEN categoria = 'fossil' THEN total_energia ELSE 0 END) AS energia_fossil,
+        SUM(CASE WHEN categoria = 'renewable' THEN total_energia ELSE 0 END) AS energia_renovavel
+    FROM energia_base
+    GROUP BY pais_id, pais
 ),
-ranking_producao_renovavel AS (
-    SELECT 
-        pais,
-        media_producao_renovavel,
-        RANK() OVER (ORDER BY media_producao_renovavel DESC) AS ranking_renovavel
-    FROM 
-        media_producao_renovavel
-),
-educacao_por_ano AS (
+
+populacao_2010 AS (
     SELECT
-        p.id AS pais_id,
-        p.nome AS pais,
-        AVG(me.media_anos_estudo) AS media_anos_estudo
-    FROM 
-        "Populacao" pop
-    JOIN 
-        "Media_Estudo" me ON me.populacao_id = pop.id
-    JOIN 
-        "Pais" p ON p.id = pop.pais_id
-    WHERE 
-        pop.ano BETWEEN 1980 AND 2010
-    GROUP BY 
-        p.id, p.nome
+        pa."id" AS pais_id,
+        SUM(p."quantidade") AS populacao_15_999
+    FROM "Populacao" p
+    JOIN "Pais" pa ON pa."id" = p."pais_id"
+    WHERE p."ano" = 2010 AND p."faixa_etaria" = '15_999' -- se não restringir ele soma a pop duas vezes
+    GROUP BY pa."id"
 ),
-ranking_educacao AS (
-    SELECT 
-        pais,
-        media_anos_estudo,
-        RANK() OVER (ORDER BY media_anos_estudo DESC) AS ranking_educacao
-    FROM 
-        educacao_por_ano
+
+pegada_final AS (
+    SELECT
+        e.pais,
+        coal, oil, gas,
+        nuclear, wind, solar, hydro, other_renewable,
+        energia_fossil,
+        energia_renovavel,
+        p.populacao_15_999,
+        ROUND(
+            (energia_fossil - energia_renovavel) / NULLIF(p.populacao_15_999, 0),
+            6
+        ) AS pegada_ecologica_per_capita
+    FROM energia_pivot e
+    JOIN populacao_2010 p ON p.pais_id = e.pais_id
 )
-SELECT 
-    r1.pais,
-    r1.media_producao_renovavel,
-    r2.media_anos_estudo,
-    (r1.ranking_renovavel + r2.ranking_educacao) / 2.0 AS ranking_combinado
-FROM 
-    ranking_producao_renovavel r1
-JOIN 
-    ranking_educacao r2 ON r1.pais = r2.pais
-ORDER BY 
-    ranking_combinado;
+
+SELECT *
+FROM pegada_final
+ORDER BY pegada_ecologica_per_capita ASC;
 
 
     """
