@@ -25,8 +25,8 @@ All the functionality is in db.py and is gated behind command-line flags. For a 
     - "education-variation"
     - "consumo-educacao"
     - "producao-educacao"
-    - "correlacao_educacao_energia"
-    - "education_disparity_energy"
+    - "correlacao-educacao-energia"
+    - "education-disparity-energy"
 
 The connection parameters can be configured via cli arguments as well:
 - `--dbname`: Default is Educacao-e-energia
