@@ -22,10 +22,11 @@ All the functionality is in db.py and is gated behind command-line flags. For a 
 - `--energy`: Reload only the energy dataset.
 - `--education`: Reload only the education dataset.
 - `--queries`: Comma-delimited list of queries. For all queries use `--queries all`. In the energy database we modified some of the countries names(United States to USA and Vietnam ti Viet Nam). Most of the queries used data between 1965 and 2010, because that was the interval that matched between the two databases. The list of available queries is:
-    - "education-variation": Finds the countries with highest variation in average years of schooling from 2000 to 2010 and displays their energy production levels
+    - "highest_education_variation"
     - "consumo-educacao"
     - "producao-educacao"
-    - "correlacao"
+    - "correlacao_educacao_energia"
+    - "education_disparity_energy"
 
 The connection parameters can be configured via cli arguments as well:
 - `--dbname`: Default is Educacao-e-energia
@@ -70,7 +71,7 @@ By connecting these domains through foreign keys, the schema enables complex que
 ## Queries
 Five queries were developed to analyze each of the questions below:
 1. Sort countries by energy consumption and show their education level
-2. Sort countries by energy production and show their education level
+2. Percentage of Educational Attainment by Age Group in Brazil (2010) 
 3. Rank countries that had the highest percentage increase in completion of secondary education and show their energy production
 4. Find the energy source that has the highest Pearson coefficient with tertiary education
 5. Countries currently(2010) ranked by lowest "Ecological Footprint per capita"((fossil_production + fossil_consumption) - (renowable_production +renowable_consumption) / population)
@@ -78,7 +79,7 @@ Five queries were developed to analyze each of the questions below:
 ## Results
 Results of the queries:
 1. Countries with higher energy consumption also tend to have historically higher averages of years of schooling, although this also depends on the size of the population.
-2.
+2. This query retrieves the distribution of educational attainment percentages (e.g., no schooling, primary, secondary, and higher education levels) for each age group in Brazil in the year 2010, ordered by age group.
 3. By subtracting the values of the percentage of complete secondary schooling over a 15-year interval, we were able to identify the countries with the greatest variation in education from 1965 to 2010, and also show their variation in energy production.
 4. Using the Pearson correlation to analyze the relationship between the average years of tertiary schooling attained and energy source production, we found that nuclear energy has the highest Pearson coefficient with higher education. This makes sense, as nuclear energy production requires high levels of technology. However, the coefficient still indicates only a weak correlation
 5. Using this arbitrary equation to try to measure the ecological footprint, we found that the Scandinavian countries have the smallest footprints, while Arab countries that are major producers of oil and gas have the largest ecological footprints. This aligns with common knowledge. We believe this query is only relevant if we use the most recent data available, which is from 2010.
