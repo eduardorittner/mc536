@@ -38,14 +38,14 @@ The connection parameters can be configured via cli arguments as well:
 
 ## Conceptual Model
 
-This conceptual model represents data on demographics, education, and energy production by country and year. Each country has multiple populations, and each population—defined by year, gender, age group, and size—is linked to a country and may include associated educational attainment percentages and average years of study. Energy production data is recorded by year and country, including various sources such as solar, wind, gas, hydro, and nuclear. These sources are represented in the “Fonte” entity, which connects each energy type to its corresponding energy and electricity data, including production, consumption, and annual variation. The model ensures that every population is tied to a specific country, and every production entry is connected to a country and optionally to energy and electricity records through sources.
+This conceptual model describes how data related to countries, population demographics, education, and electricity is structured. Each País (Country) has many População (Population) records, representing individuals residing in that country by year, gender, and age group. Each population group is associated with one Escolaridade (Education) entry detailing the percentages of people by level of educational attainment, and one Média_Estudo entry containing average years of schooling (primary, secondary, and higher). The country also consumes or produces Eletricidade (Electricity), which is recorded by year and linked to a specific Tipo_Eletricidade (Electricity Type), such as wind, coal, or solar. This electricity is both consumed and produced by the country, and each energy entry is classified by its type. The model supports analysis of educational progress and energy dynamics over time across demographic segments and countries
 
 ![conceitual](https://github.com/user-attachments/assets/0bc0386f-f7c0-4131-a2a9-8e4c9b9eabe4)
 
 
 ## Relational Model
 
-The relational model reflects a normalized and modular structure that captures the connection between countries, their population demographics, education indicators, and energy production metrics. At its core, each country (Pais) is linked to multiple population groups (Populacao), segmented by year, sex, and age range. Each population group can then be analyzed educationally via two tables: Media_Estudo, which stores average years of schooling, and Escolaridade, which contains detailed percentages of educational attainment. On the energy side, each country and year combination in Producao references multiple energy sources, each of which connects to a Fonte—a bridge to both Energia (production/consumption data) and Eletricidade (electricity-specific data). This structure ensures analytical flexibility, enabling queries that associate energy profiles with educational development across time and geography.
+This relational database stores data on countries, populations, education, and energy. The Pais table lists countries, each linked to multiple entries in Populacao, which records demographic data by year, gender, and age group. Educational attainment for each population group is detailed in Escolaridade (percentages by level) and Media_Estudo (average years of schooling). Energy data is managed in Eletricidade, which logs production and consumption by country, year, and energy type—classified in Tipo_Eletricidade. This structure supports analyses of educational and energy trends across time and demographics.
 
 ![Relacional](https://github.com/user-attachments/assets/0e2407e8-920c-4f39-a477-83b4779e180e)
 
@@ -60,13 +60,15 @@ The physical model generated from pgAdmin4 can be found on this [link](https://g
 
 ## Database Schema
 
-Our database schema is designed to reflect the relationship between a country's population, its education levels, and its energy production and consumption. It was structured to accommodate both datasets in a normalized and scalable way, while preserving referential integrity between all key metrics.
+The database schema is designed to store and manage information related to countries, population demographics, education, and electricity production and consumption. It includes six main tables with clearly defined relationships.
 
-At the center of the schema is the "Pais" table, which contains the unique list of countries present in both datasets. The "Populacao" table captures demographic data per country, year, gender, and age group, and is linked directly to "Pais". For each population group, we store education-related statistics in two linked tables: "Media_Estudo" (average years of schooling) and "Escolaridade" (distribution across primary, secondary, and higher education levels).
+The "Pais" table stores a list of countries, each identified by a unique name and a primary key (id) that is auto-generated. The "Populacao" table records demographic information such as the year, gender, age group, and the number of individuals. Each population entry is linked to a specific country through the pais_id foreign key.
 
-The energy-related data is structured around the "Producao" table, which aggregates annual production metrics per country, broken down by energy source (e.g., wind, solar, coal). Each production entry points to multiple "Fonte" records, which combine information from both "Energia" (e.g., total production/consumption) and "Eletricidade" (e.g., electricity output and share). This modular design allows us to analyze both total energy trends and electricity-specific insights for each energy type.
+The "Escolaridade" table contains percentages of the population that have reached or completed various education levels, including no schooling, primary, secondary, and higher education. This table is linked to the population data through the populacao_id foreign key. Similarly, the "Media_Estudo" table stores the average number of years spent in primary, secondary, and higher education, as well as the overall average years of study, also linked to the population via populacao_id.
 
-By connecting these domains through foreign keys, the schema enables complex queries that link education metrics with energy variables — such as identifying correlations between investment in renewables and increases in schooling, or ranking countries by energy consumption relative to their education levels.
+The "Tipo_Eletricidade" table defines the types of electricity (such as hydroelectric, fossil fuel, or renewable), and the "Eletricidade" table records data on electricity production and consumption for each country, year, and type of electricity. The electricity data references the country with pais_id and the type of electricity with tipo_eletricidade_id.
+
+All primary keys are integers generated by default as identity values, and the foreign key constraints enforce referential integrity between related tables. This schema allows for comprehensive tracking and analysis of social and energy-related indicators over time and across countries.
 
 ## Queries
 Five queries were developed to analyze each of the questions below:
