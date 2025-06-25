@@ -141,8 +141,6 @@ def rank_countries_by_education_increase(
         {"$match": {"education_increase_pct": {"$ne": None}}},
         # Sort by the highest education increase before the lookup for efficiency
         {"$sort": {"education_increase_pct": -1}},
-        # Limit to n_matches early to reduce lookup workload
-        {"$limit": n_matches},
         # Join with energy data for both start and end years
         {
             "$lookup": {
@@ -205,6 +203,7 @@ def rank_countries_by_education_increase(
                 "energy_metrics_increase_pct": 1,
             }
         },
+        {"$limit": n_matches},
     ]
 
     # Handle the edge case where no energy metrics are requested
