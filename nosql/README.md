@@ -38,3 +38,29 @@ MongoDB é projetado para escalabilidade horizontal com particionamento automát
 
 # Consultas
 
+## Rank countries by education increase
+
+Essa consulta visa ordenar os países com o maior aumento percentual da métrica de educação fornecida, conjuntamente com as métricas de energia fornecidas. Somente países com pelo menos uma das métricas de energia presentes serão mostrados, por isso essa query retorna mais resultados quando mais de uma métrica de energia é fornecida.
+
+Parâmetros:
+
+- `db`: Conexão ativa ao banco de dados
+- `energy_collection_name`: Nome da coleção de energia no banco
+- `education_collection_name`: Nome da coleção de educação no banco
+- `education_metric`: Métrica de educação utilizada para ordenar os países
+- `start_year`: Início do período a ser considerado
+- `end_year`: Fim do período a ser considerado
+- `energy_metrics`: Métricas de energia para visualizar
+- `n_matches`: Número máximo de países a serem mostrados
+
+## Sort countries by energy and education
+
+Essa consulta ordena países pelo consumo total de energia no ano especificado e exibe dados educacionais associados.
+
+Parâmetros:
+
+- `db`: Conexão ativa ao banco de dados
+- `energy_collection_name`: Nome da coleção de energia no banco
+- `education_collection_name`: Nome da coleção de educação no banco
+- `year`: Ano da consulta
+- `matches`: Número máximo de países a serem mostrados

@@ -8,6 +8,7 @@ class EducationIncreaseMetric(Enum):
     SECONDARY_COMPLETE = "secondary_schooling_complete"
     TERTIARY_COMPLETE = "tertiary_schooling_complete"
 
+
 def rank_countries_by_education_increase(
     db,
     energy_collection_name,
@@ -241,9 +242,8 @@ def rank_countries_by_education_increase(
                 print(f"    {metric_name}: N/A")
 
 
-
 def sort_countries_by_energy_and_education(
-    db, energy_collection_name, education_collection_name, year=2010
+    db, energy_collection_name, education_collection_name, n_matches, year=2010
 ):
     """
     Ordena países pelo consumo total de energia no ano especificado
@@ -251,9 +251,14 @@ def sort_countries_by_energy_and_education(
     """
 
     consumption_fields = [
-        "coal_consumption", "solar_consumption", "wind_consumption",
-        "gas_consumption", "hydro_consumption", "nuclear_consumption",
-        "oil_consumption", "other_renewable_consumption"
+        "coal_consumption",
+        "solar_consumption",
+        "wind_consumption",
+        "gas_consumption",
+        "hydro_consumption",
+        "nuclear_consumption",
+        "oil_consumption",
+        "other_renewable_consumption",
     ]
 
     total_consumption_expr = {
@@ -291,20 +296,17 @@ def sort_countries_by_energy_and_education(
             }
         },
         {"$unwind": "$education_data"},
-        {
-            "$addFields": {
-                "total_consumption": total_consumption_expr
-            }
-        },
+        {"$addFields": {"total_consumption": total_consumption_expr}},
         {"$match": {"total_consumption": {"$ne": None}}},
         {"$sort": {"total_consumption": -1}},
+        {"$limit": n_matches},
         {
             "$project": {
                 "_id": 0,
                 "country": 1,
                 "year": 1,
                 "total_consumption": 1,
-                "education_level": "$education_data"
+                "education_level": "$education_data",
             }
         },
     ]
@@ -319,27 +321,31 @@ def sort_countries_by_energy_and_education(
     for doc in results:
         print(f"Country: {doc.get('country')}, Year: {doc.get('year')}")
         total = doc.get("total_consumption")
-        print(f"  Total Consumption: {total:,.2f} TWh" if total is not None else "  Total Consumption: N/A")
+        print(
+            f"  Total Consumption: {total:,.2f} TWh"
+            if total is not None
+            else "  Total Consumption: N/A"
+        )
 
         edu = doc.get("education_level", {})
         print("  Education Level:")
         print(f"    Avg. Schooling Years: {edu.get('schooling_years_avg', 'N/A'):.2f}")
         print(f"    No Schooling (%): {edu.get('no_schooling', 'N/A'):.2f}%")
-        print(f"    Primary Complete (%): {edu.get('primary_schooling_complete', 'N/A'):.2f}%")
-        print(f"    Secondary Complete (%): {edu.get('secondary_schooling_complete', 'N/A'):.2f}%")
-        print(f"    Tertiary Complete (%): {edu.get('tertiary_schooling_complete', 'N/A'):.2f}%")
+        print(
+            f"    Primary Complete (%): {edu.get('primary_schooling_complete', 'N/A'):.2f}%"
+        )
+        print(
+            f"    Secondary Complete (%): {edu.get('secondary_schooling_complete', 'N/A'):.2f}%"
+        )
+        print(
+            f"    Tertiary Complete (%): {edu.get('tertiary_schooling_complete', 'N/A'):.2f}%"
+        )
         print("-" * 40)
-
-
 
 
 uri = "mongodb://localhost:27017/"
 client = MongoClient(uri)
 db = client["education_and_energy"]
-# sort_countries_by_energy_and_education(db, "energy", "education", year=2010)
 
 
-
-sort_countries_by_energy_and_education(
-    db, "energy", "education", year=2010
-)
+sort_countries_by_energy_and_education(db, "energy", "education", 10)
