@@ -10,13 +10,16 @@ Para executar as queries, rode o script `queries.py`.
 As dependências para o script python estão especificadas tanto no `pyproject.toml` quanto no `requirements.txt` e são `csv`, `json` e `pymongo`.
 
 # Justificativa da Escolha do Banco
+
+O MongoDB tem suporte para [replicação](https://www.mongodb.com/docs/manual/replication/), [particionamento](https://www.mongodb.com/docs/manual/sharding/) e [balanceamento de carga](https://www.mongodb.com/docs/manual/core/sharding-balancer-administration/). Além disso, ele tem uma garantia de alta tolerância à falhas através de [eleições](https://www.mongodb.com/resources/basics/high-availability#high-availability-in-mongodb), o que significa que mesmo se a instância primária do banco cair, as outras instâncias são capazes de se organizar e "eleger" uma nova instância primária. Além disso, através de [read concerns](https://www.mongodb.com/docs/manual/reference/read-concern/) e [write concerns](https://www.mongodb.com/docs/manual/reference/write-concern/) a garantia de operações read e write podem ser configuradas para se obter garantias mais fortes, ou operações mais rápidas, dependendo das necessidades do projeto.
+
 ## Forma de armazenamento de arquivos
 
 O MongoDB armazena os dados em formato BSON (uma versão binária do JSON), ideal para dados semi-estruturados e com esquemas dinâmicos. Isso permite armazenar documentos com campos variados sem precisar migrar ou alterar a estrutura da base.
 
 ## Linguagem e processamento de consultas
 
-MongoDB utiliza a linguagem MongoDB Query Language (MQL), baseada em JSON, que facilita a manipulação de documentos completos. Ele também oferece o Aggregation Framework, poderoso para transformações, filtros, joins e análises complexas.
+MongoDB utiliza a linguagem MongoDB Query Language (MQL), baseada em JSON, que facilita a manipulação de documentos completos, e oferece funcionalidade muito completas. Ele também oferece o Aggregation Framework, poderoso para transformações, filtros, joins e análises complexas.
 
 ## Processamento e controle de transações
 
@@ -24,7 +27,7 @@ MongoDB possui suporte a transações ACID multi-documentos, com boa performance
 
 ## Mecanismos de recuperação e segurança
 
-- Recuperação: MongoDB possui replicação automática (replica sets) e journaling para recuperação de falhas.
+- Recuperação: MongoDB possui replicação automática (replica sets), tolerância e falha da instância primária e journaling para recuperação de falhas.
 
 - Segurança: Suporta autenticação via SCRAM, TLS/SSL, controle de acesso baseado em funções (RBAC), auditoria e criptografia em repouso.
 
