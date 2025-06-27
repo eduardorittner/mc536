@@ -341,6 +341,69 @@ def sort_countries_by_energy_and_education(
         )
         print("-" * 40)
 
+def get_education_distribution_by_age(db, country, year):
+    pipeline = [
+        {"$match": {"country": country, "year": year}},
+        {"$project": {
+            "agefrom": 1,
+            "ageto": 1,
+            "no_schooling": 1,
+            "primary_schooling": 1,
+            "primary_schooling_complete": 1,
+            "secondary_schooling": 1,
+            "secondary_schooling_complete": 1,
+            "tertiary_schooling": 1,
+            "tertiary_schooling_complete": 1
+        }},
+        {"$addFields": {
+            "total": {
+                "$add": [
+                    {"$ifNull": ["$no_schooling", 0]},
+                    {"$ifNull": ["$primary_schooling", 0]},
+                    {"$ifNull": ["$secondary_schooling", 0]},
+                    {"$ifNull": ["$tertiary_schooling", 0]}
+                ]
+            }
+        }},
+        {"$project": {
+            "agefrom": 1,
+            "ageto": 1,
+            "no_schooling_pct": {
+                "$cond": [{"$gt": ["$total", 0]},
+                          {"$multiply": [{"$divide": ["$no_schooling", "$total"]}, 100]},
+                          0]
+            },
+            "primary_pct": {
+                "$cond": [{"$gt": ["$total", 0]},
+                          {"$multiply": [{"$divide": ["$primary_schooling", "$total"]}, 100]},
+                          0]
+            },
+            "secondary_pct": {
+                "$cond": [{"$gt": ["$total", 0]},
+                          {"$multiply": [{"$divide": ["$secondary_schooling", "$total"]}, 100]},
+                          0]
+            },
+            "tertiary_pct": {
+                "$cond": [{"$gt": ["$total", 0]},
+                          {"$multiply": [{"$divide": ["$tertiary_schooling", "$total"]}, 100]},
+                          0]
+            }
+        }},
+        {"$sort": {"agefrom": 1}}
+    ]
+
+    results = list(db.education.aggregate(pipeline))
+    
+    print(f"\nDistribuição educacional em {country}, {year}:\n")
+    for row in results:
+        print(f"{row['agefrom']}-{row['ageto']} anos:")
+        print(f"  Sem escolaridade: {row['no_schooling_pct']:.1f}%")
+        print(f"  Ensino primário: {row['primary_pct']:.1f}%")
+        print(f"  Ensino secundário: {row['secondary_pct']:.1f}%")
+        print(f"  Ensino superior: {row['tertiary_pct']:.1f}%\n")
+
+    return results
+
 
 uri = "mongodb://localhost:27017/"
 client = MongoClient(uri)
