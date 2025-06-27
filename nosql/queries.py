@@ -404,6 +404,97 @@ def get_education_distribution_by_age(db, country, year):
 
     return results
 
+def ecological_footprint_ranking(db, year):
+    pipeline = [
+        {"$match": {"year": year}},
+        {"$lookup": {
+            "from": "education",  # para pegar a população
+            "let": {"country_name": "$country", "yr": "$year"},
+            "pipeline": [
+                {"$match": {
+                    "$expr": {
+                        "$and": [
+                            {"$eq": ["$country", "$$country_name"]},
+                            {"$eq": ["$year", "$$yr"]},
+                            {"$eq": ["$agefrom", 15]},
+                            {"$eq": ["$ageto", 999]}  # população total
+                        ]
+                    }
+                }},
+                {"$project": {"population": 1, "_id": 0}}
+            ],
+            "as": "population_data"
+        }},
+        {"$unwind": "$population_data"},
+        {"$addFields": {
+            "population": "$population_data.population",
+            "fossil_production": {
+                "$add": [
+                    {"$ifNull": ["$oil_electricity", 0]},
+                    {"$ifNull": ["$coal_electricity", 0]},
+                    {"$ifNull": ["$gas_electricity", 0]}
+                ]
+            },
+            "fossil_consumption": {
+                "$add": [
+                    {"$ifNull": ["$oil_consumption", 0]},
+                    {"$ifNull": ["$coal_consumption", 0]},
+                    {"$ifNull": ["$gas_consumption", 0]}
+                ]
+            },
+            "renewable_production": {
+                "$add": [
+                    {"$ifNull": ["$hydro_electricity", 0]},
+                    {"$ifNull": ["$wind_electricity", 0]},
+                    {"$ifNull": ["$solar_electricity", 0]},
+                    {"$ifNull": ["$nuclear_electricity", 0]},
+                    {"$ifNull": ["$other_renewable_electricity", 0]}
+                ]
+            },
+            "renewable_consumption": {
+                "$add": [
+                    {"$ifNull": ["$hydro_consumption", 0]},
+                    {"$ifNull": ["$wind_consumption", 0]},
+                    {"$ifNull": ["$solar_consumption", 0]},
+                    {"$ifNull": ["$nuclear_consumption", 0]},
+                    {"$ifNull": ["$other_renewable_consumption", 0]}
+                ]
+            }
+        }},
+        {"$addFields": {
+            "ecological_footprint_per_capita": {
+                "$cond": [
+                    {"$gt": ["$population", 0]},
+                    {
+                        "$divide": [
+                            {"$subtract": [
+                                {"$add": ["$fossil_production", "$fossil_consumption"]},
+                                {"$add": ["$renewable_production", "$renewable_consumption"]}
+                            ]},
+                            "$population"
+                        ]
+                    },
+                    None
+                ]
+            }
+        }},
+        {"$project": {
+            "country": 1,
+            "ecological_footprint_per_capita": 1
+        }},
+        {"$sort": {"ecological_footprint_per_capita": 1}}  # Menor impacto primeiro
+    ]
+
+    results = list(db.energy.aggregate(pipeline))
+
+    print(f"\nRanking de países por menor pegada ecológica per capita no ano {year}:\n")
+    for rank, row in enumerate(results, 1):
+        ef = row['ecological_footprint_per_capita']
+        ef_display = f"{ef:.6f}" if ef is not None else "N/A"
+        print(f"{rank:2}. {row['country']:25} -> Pegada per capita: {ef_display}")
+
+    return results
+    
 
 uri = "mongodb://localhost:27017/"
 client = MongoClient(uri)
