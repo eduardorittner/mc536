@@ -496,9 +496,113 @@ def ecological_footprint_ranking(db, year):
     return results
     
 
+def top_countries_by_age_and_schooling(db, age_from: int, age_to: int, limit: int = 10):
+    """
+    Lista os países com maior média de anos de escolaridade para uma faixa etária específica,
+    mostrando também o ano e a soma da produção de energia naquele ano.
+    Valores negativos ou nulos são filtrados.
+
+    Parâmetros:
+        db: conexão com o banco MongoDB.
+        age_from: início da faixa etária (ex: 15).
+        age_to: fim da faixa etária (ex: 24).
+        limit: número máximo de países a exibir.
+
+    Efeito:
+        Print dos resultados diretamente no console.
+    """
+    
+    pipeline = [
+        {
+            "$match": {
+                "agefrom": age_from,
+                "ageto": age_to,
+                "schooling_years_avg": {"$gt": 0}
+            }
+        },
+        {
+            "$lookup": {
+                "from": "energy",
+                "let": {"country_name": "$country", "year_val": "$year"},
+                "pipeline": [
+                    {
+                        "$match": {
+                            "$expr": {
+                                "$and": [
+                                    {"$eq": ["$country", "$$country_name"]},
+                                    {"$eq": ["$year", "$$year_val"]}
+                                ]
+                            }
+                        }
+                    },
+                    {
+                        "$project": {
+                            "_id": 0,
+                            "total_energy_production": {
+                                "$add": [
+                                    {"$ifNull": ["$coal_electricity", 0]},
+                                    {"$ifNull": ["$wind_electricity", 0]},
+                                    {"$ifNull": ["$solar_electricity", 0]},
+                                    {"$ifNull": ["$gas_electricity", 0]},
+                                    {"$ifNull": ["$hydro_electricity", 0]},
+                                    {"$ifNull": ["$nuclear_electricity", 0]},
+                                    {"$ifNull": ["$oil_electricity", 0]},
+                                    {"$ifNull": ["$other_renewable_electricity", 0]}
+                                ]
+                            }
+                        }
+                    }
+                ],
+                "as": "energy_data"
+            }
+        },
+        {
+            "$unwind": "$energy_data"
+        },
+        {
+            "$match": {
+                "energy_data.total_energy_production": {"$gt": 0}
+            }
+        },
+        {
+            "$project": {
+                "_id": 0,
+                "country": 1,
+                "year": 1,
+                "agefrom": 1,
+                "ageto": 1,
+                "schooling_years_avg": 1,
+                "total_energy_production": "$energy_data.total_energy_production"
+            }
+        },
+        {
+            "$sort": {
+                "schooling_years_avg": -1
+            }
+        },
+        {
+            "$limit": limit
+        }
+    ]
+
+    resultados = db["education"].aggregate(pipeline)
+
+    print(f"\nTop {limit} países para faixa etária {age_from}-{age_to} ordenados por schooling_years_avg:\n")
+    for doc in resultados:
+        schooling = doc.get("schooling_years_avg")
+        energy = doc.get("total_energy_production")
+
+        if schooling is not None and energy is not None:
+            print(f"- {doc['country']} ({doc['year']}): idade {doc['agefrom']}-{doc['ageto']}, "
+                  f"escolaridade média = {schooling:.2f}, "
+                  f"produção total de energia = {energy:.2f}")
+
 uri = "mongodb://localhost:27017/"
 client = MongoClient(uri)
 db = client["education_and_energy"]
 
 
-sort_countries_by_energy_and_education(db, "energy", "education", 10)
+# sort_countries_by_energy_and_education(db, "energy", "education", 10)
+# get_education_distribution_by_age(db, "Brazil", 2010)
+# ecological_footprint_ranking(db, 2010)
+top_countries_by_age_and_schooling(db, age_from=15, age_to=999, limit=5)
