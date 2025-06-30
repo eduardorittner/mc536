@@ -5,6 +5,7 @@ from pymongo import MongoClient
 
 ENERGY_DATASET_FILE = "energy.csv"
 EDUCATION_DATASET_FILE = "education.csv"
+PROCESSED_COUNTRIES_FILE = "countries.json"
 PROCESSED_ENERGY_FILE = "energy.json"
 PROCESSED_EDUCATION_FILE = "education.json"
 
@@ -21,8 +22,28 @@ ENERGY_FIELDS = [
     "other_renewable_electricity", "other_renewable_consumption"
 ]
 
-def process_energy(input_path, output_path):
+def update_countries(countries, country_file):
+    if not os.path.exists(PROCESSED_EDUCATION_FILE):
+        countries = [{"country": country} for country in list(dict.fromkeys(countries))]
+        with open(country_file, "w") as f:
+            json.dump(countries, f, indent=4)
+    else:
+        with open(country_file, "r") as f:
+            preexisting_countries = [country["country"] for country in json.load(f)]
+
+        with open(country_file, "w") as f:
+            countries = list(dict.fromkeys(countries))
+            for country in countries:
+                if country not in preexisting_countries:
+                    preexisting_countries.append(country)
+
+            merged_countries = [{"country": country} for country in preexisting_countries]
+            json.dump(merged_countries, f, indent=4)
+
+
+def process_energy(input_path, output_path, countries_path):
     data = []
+    countries = []
     with open(input_path, "r") as f:
         reader = csv.DictReader(f)
         for row in reader:
@@ -31,9 +52,11 @@ def process_energy(input_path, output_path):
                 if key not in row:
                     continue
                 value = row[key]
+
                 if value == "":
                     continue
                 if key == "country":
+                    countries.append(value)
                     processed_row["country"] = value
                 elif key == "year":
                     processed_row["year"] = int(value)
@@ -44,6 +67,8 @@ def process_energy(input_path, output_path):
 
     with open(output_path, "w") as f:
         json.dump(data, f, indent=4)
+
+    update_countries(countries, PROCESSED_COUNTRIES_FILE)
 
 def process_education(input_path, output_path):
     renamed_keys = {
@@ -61,6 +86,7 @@ def process_education(input_path, output_path):
     }
 
     data = []
+    countries = []
     with open(input_path, "r") as f:
         reader = csv.DictReader(f)
         for row in reader:
@@ -70,6 +96,7 @@ def process_education(input_path, output_path):
                     case "BLcode" | "WBcode" | "region_code" | "sex":
                         continue
                     case "country":
+                        countries.append(value)
                         processed_row[key] = value
                     case "agefrom" | "ageto" | "year":
                         processed_row[key] = int(value)
@@ -83,6 +110,8 @@ def process_education(input_path, output_path):
 
     with open(output_path, "w") as f:
         json.dump(data, f, indent=4)
+
+    update_countries(countries, PROCESSED_COUNTRIES_FILE)
 
 def connect():
     uri = "mongodb://localhost:27017/"
@@ -103,7 +132,7 @@ if __name__ == "__main__":
     # Processa e importa energy
     if not os.path.exists(PROCESSED_ENERGY_FILE):
         print(f"{PROCESSED_ENERGY_FILE} não existe. Processando {ENERGY_DATASET_FILE}")
-        process_energy(ENERGY_DATASET_FILE, PROCESSED_ENERGY_FILE)
+        process_energy(ENERGY_DATASET_FILE, PROCESSED_ENERGY_FILE, PROCESSED_COUNTRIES_FILE)
         print("Energy processado e salvo em JSON")
     else:
         print(f"Arquivo {PROCESSED_ENERGY_FILE} já existe")
@@ -123,4 +152,7 @@ if __name__ == "__main__":
     print("Importando dados de education")
     with open(PROCESSED_EDUCATION_FILE, "r") as f:
         import_collection(f, db, "education")
+
+    with open(PROCESSED_COUNTRIES_FILE, "r") as f:
+        import_collection(f, db, "countries")
 
