@@ -9,6 +9,50 @@ PROCESSED_COUNTRIES_FILE = "countries.json"
 PROCESSED_ENERGY_FILE = "energy.json"
 PROCESSED_EDUCATION_FILE = "education.json"
 
+ENERGY_TYPES = [
+    "coal",
+    "wind",
+    "solar",
+    "gas",
+    "hydro",
+    "nuclear",
+    "oil",
+    "other_renewable"
+]
+
+def energy_type_from_field(field):
+    for type in ENERGY_TYPES:
+        if type in field:
+            return type
+
+def field_in_row(row, type, field):
+    for energy in row:
+        if energy["energy_type"] == type:
+            return energy
+
+    return None
+
+def add_energy_field(row, country, year, field, value):
+    type = energy_type_from_field(field)
+
+    old_dict = field_in_row(row, type, field)
+
+    if old_dict is not None:
+        if "consumption" in field:
+            old_dict["consumption"] = value
+        elif "production" in field:
+            old_dict["production"] = value
+    else:
+        new_dict = {}
+        new_dict["energy_type"] = type
+        new_dict["country"] = country
+        new_dict["year"] = year
+        if "consumption" in field:
+            new_dict["consumption"] = value
+        elif "electricity" in field:
+            new_dict["production"] = value
+        row.append(new_dict)
+
 # Campos desejados para energy
 ENERGY_FIELDS = [
     "country", "year",
@@ -47,7 +91,9 @@ def process_energy(input_path, output_path, countries_path):
     with open(input_path, "r") as f:
         reader = csv.DictReader(f)
         for row in reader:
-            processed_row = {}
+            processed_row = []
+            year = 0
+            country = ""
             for key in ENERGY_FIELDS:
                 if key not in row:
                     continue
@@ -56,14 +102,15 @@ def process_energy(input_path, output_path, countries_path):
                 if value == "":
                     continue
                 if key == "country":
+                    country = value
                     countries.append(value)
-                    processed_row["country"] = value
                 elif key == "year":
-                    processed_row["year"] = int(value)
+                    year = int(value)
+
                 else:
-                    processed_row[key] = float(value)
-            if processed_row:
-                data.append(processed_row)
+                    add_energy_field(processed_row, country, year, key, value)
+            for energy in processed_row:
+                data.append(energy)
 
     with open(output_path, "w") as f:
         json.dump(data, f, indent=4)
