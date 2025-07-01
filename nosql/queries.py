@@ -13,72 +13,66 @@ def rank_countries_by_education_increase(
     db,
     energy_collection_name,
     education_collection_name,
-    # Note that education metric should be the string value
-    # So pass in enum.value
+    countries_collection_name,
     education_metric,
     start_year,
     end_year,
     energy_metrics,
     n_matches,
 ):
-    """
-    Ranks countries by the highest percentual increase in a specific education metric
-    over a given period and returns the percentual increase in various energy metrics
-    over the same period for those countries.
-
-    Filters out countries for which NO energy metric increases could be calculated.
-    """
     education_collection = db[education_collection_name]
+    countries = [doc["country"] for doc in db[countries_collection_name].find()]
 
-    # Dynamically construct the projection for calculating energy metric increases
     energy_increase_projection = {}
-    for metric in energy_metrics:
-        energy_increase_projection[metric] = {
-            "$cond": [
-                {
-                    "$and": [
-                        {"$ne": [f"$start_energy_data.{metric}", None]},
-                        {"$ne": [f"$end_energy_data.{metric}", None]},
-                        {"$ne": [f"$start_energy_data.{metric}", 0]},
-                    ]
+    for metric_string in energy_metrics:
+        metric_type, metric_name = metric_string.rsplit("_", 1)
+        energy_increase_projection[metric_string] = {
+            "$let": {
+                "vars": {
+                    "start_val": {"$arrayElemAt": [f"$start_docs.{metric_type}", 0]},
+                    "end_val": {"$arrayElemAt": [f"$end_docs.{metric_type}", 0]},
                 },
-                {
-                    "$multiply": [
+                "in": {
+                    "$cond": [
                         {
-                            "$divide": [
-                                {
-                                    "$subtract": [
-                                        f"$end_energy_data.{metric}",
-                                        f"$start_energy_data.{metric}",
-                                    ]
-                                },
-                                f"$start_energy_data.{metric}",
+                            "$and": [
+                                {"$ne": ["$$start_val", None]},
+                                {"$ne": ["$$end_val", None]},
+                                {"$ne": ["$$start_val", 0]},
                             ]
                         },
-                        100,
+                        {
+                            "$multiply": [
+                                {
+                                    "$divide": [
+                                        {"$subtract": ["$$end_val", "$$start_val"]},
+                                        "$$start_val",
+                                    ]
+                                },
+                                100,
+                            ]
+                        },
+                        None,
                     ]
                 },
-                None,  # Result if conditions are not met
-            ]
+            }
         }
 
-    # Dynamically construct the $or condition for the new $match stage
-    # This ensures at least one energy metric could be calculated.
     filter_valid_energy_data_conditions = [
         {f"energy_metrics_increase_pct.{metric}": {"$ne": None}}
         for metric in energy_metrics
     ]
 
     pipeline = [
-        # Match on start and end years in the education collection
+        # Education calculation stages remain the same
         {
             "$match": {
+                "country": {"$in": countries},
                 "year": {"$in": [start_year, end_year]},
                 "agefrom": 15,
                 "ageto": 999,
             }
         },
-        # Group by country to get education values for start and end years
         {
             "$group": {
                 "_id": "$country",
@@ -102,7 +96,6 @@ def rank_countries_by_education_increase(
                 },
             }
         },
-        # Calculate the percentage increase in education
         {
             "$project": {
                 "_id": 0,
@@ -111,9 +104,9 @@ def rank_countries_by_education_increase(
                     "$cond": [
                         {
                             "$and": [
+                                {"$ne": ["$start_edu_value", 0]},
                                 {"$ne": ["$start_edu_value", None]},
                                 {"$ne": ["$end_edu_value", None]},
-                                {"$ne": ["$start_edu_value", 0]},
                             ]
                         },
                         {
@@ -137,64 +130,53 @@ def rank_countries_by_education_increase(
                 },
             }
         },
-        # Filter out countries where education increase could not be calculated
         {"$match": {"education_increase_pct": {"$ne": None}}},
-        # Sort by the highest education increase before the lookup for efficiency
         {"$sort": {"education_increase_pct": -1}},
-        # Join with energy data for both start and end years
+        # 1. A much simpler lookup that just gets all relevant documents.
         {
             "$lookup": {
                 "from": energy_collection_name,
-                "let": {"country_name": "$country"},
+                "let": {
+                    "country_name": "$country",
+                    "start": start_year,
+                    "end": end_year,
+                },
                 "pipeline": [
                     {
                         "$match": {
                             "$expr": {
                                 "$and": [
                                     {"$eq": ["$country", "$$country_name"]},
-                                    {"$in": ["$year", [start_year, end_year]]},
+                                    {"$in": ["$year", ["$$start", "$$end"]]},
                                 ]
                             }
                         }
-                    },
+                    }
                 ],
                 "as": "energy_data",
             }
         },
-        # Create fields for start and end year energy data
         {
             "$addFields": {
-                "start_energy_data": {
-                    "$arrayElemAt": [
-                        {
-                            "$filter": {
-                                "input": "$energy_data",
-                                "as": "data",
-                                "cond": {"$eq": ["$$data.year", start_year]},
-                            }
-                        },
-                        0,
-                    ]
+                "start_docs": {
+                    "$filter": {
+                        "input": "$energy_data",
+                        "as": "d",
+                        "cond": {"$eq": ["$$d.year", start_year]},
+                    }
                 },
-                "end_energy_data": {
-                    "$arrayElemAt": [
-                        {
-                            "$filter": {
-                                "input": "$energy_data",
-                                "as": "data",
-                                "cond": {"$eq": ["$$data.year", end_year]},
-                            }
-                        },
-                        0,
-                    ]
+                "end_docs": {
+                    "$filter": {
+                        "input": "$energy_data",
+                        "as": "d",
+                        "cond": {"$eq": ["$$d.year", end_year]},
+                    }
                 },
             }
         },
-        # Calculate percentual increase for each energy metric
         {"$addFields": {"energy_metrics_increase_pct": energy_increase_projection}},
-        # ***** NEW STAGE: Filter out countries where ALL energy metrics are null *****
-        {"$match": {"$or": filter_valid_energy_data_conditions}},
-        # Final projection to shape the output
+        # TODO: can we add this again
+        # {"$match": {"$or": filter_valid_energy_data_conditions}},
         {
             "$project": {
                 "_id": 0,
@@ -602,7 +584,18 @@ client = MongoClient(uri)
 db = client["education_and_energy"]
 
 
+rank_countries_by_education_increase(
+    db,
+    "energy",
+    "education",
+    "countries",
+    EducationIncreaseMetric.AVG_SCHOOL_YEARS.value,
+    1990,
+    1995,
+    ["oil_consumption"],
+    10,
+)
 # sort_countries_by_energy_and_education(db, "energy", "education", 10)
 # get_education_distribution_by_age(db, "Brazil", 2010)
 # ecological_footprint_ranking(db, 2010)
-top_countries_by_age_and_schooling(db, age_from=15, age_to=999, limit=5)
+# top_countries_by_age_and_schooling(db, age_from=15, age_to=999, limit=5)
