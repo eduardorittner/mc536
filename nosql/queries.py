@@ -18,7 +18,7 @@ def rank_countries_by_education_increase(
     start_year,
     end_year,
     energy_metrics,
-    n_matches,
+    limit,
 ):
     education_collection = db[education_collection_name]
     countries = [doc["country"] for doc in db[countries_collection_name].find()]
@@ -185,7 +185,7 @@ def rank_countries_by_education_increase(
                 "energy_metrics_increase_pct": 1,
             }
         },
-        {"$limit": n_matches},
+        {"$limit": limit},
     ]
 
     # Handle the edge case where no energy metrics are requested
@@ -228,7 +228,7 @@ def sort_countries_by_energy_and_education(
     energy_collection_name,
     education_collection_name,
     countries_collection_name,
-    n_matches,
+    limit,
     year=2010,
 ):
     countries = [doc["country"] for doc in db[countries_collection_name].find()]
@@ -278,7 +278,7 @@ def sort_countries_by_energy_and_education(
         },
         {"$unwind": "$education_data"},
         {"$sort": {"total_consumption": -1}},
-        {"$limit": n_matches},
+        {"$limit": limit},
         {
             "$project": {
                 "_id": 0,
@@ -321,7 +321,7 @@ def sort_countries_by_energy_and_education(
         )
         print("-" * 40)
 
-def get_education_distribution_by_age(db, country, year):
+def get_education_distribution_by_age(db, country, year, limit):
     pipeline = [
         {"$match": {"country": country, "year": year}},
         {"$project": {
@@ -369,7 +369,8 @@ def get_education_distribution_by_age(db, country, year):
                           0]
             }
         }},
-        {"$sort": {"agefrom": 1}}
+        {"$sort": {"agefrom": 1}},
+        {"$limit": limit},
     ]
 
     results = list(db.education.aggregate(pipeline))
@@ -384,7 +385,7 @@ def get_education_distribution_by_age(db, country, year):
 
     return results
 
-def ecological_footprint_ranking(db, year):
+def ecological_footprint_ranking(db, year, limit):
     pipeline = [
         {"$match": {"year": year}},
         {"$lookup": {
@@ -462,7 +463,8 @@ def ecological_footprint_ranking(db, year):
             "country": 1,
             "ecological_footprint_per_capita": 1
         }},
-        {"$sort": {"ecological_footprint_per_capita": 1}}  # Menor impacto primeiro
+        {"$sort": {"ecological_footprint_per_capita": 1}},
+        { "$limit": limit }
     ]
 
     results = list(db.energy.aggregate(pipeline))
@@ -580,6 +582,11 @@ def top_countries_by_age_and_schooling(db, age_from: int, age_to: int, limit: in
 uri = "mongodb://localhost:27017/"
 client = MongoClient(uri)
 db = client["education_and_energy"]
+
+# TODO: add limits for all queries
+# TOOD: Remove llm comments
+# TODO: pass collection names as parameters
+# TODO: update example calls
 
 
 # rank_countries_by_education_increase(
