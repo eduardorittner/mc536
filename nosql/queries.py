@@ -224,34 +224,34 @@ def rank_countries_by_education_increase(
 
 
 def sort_countries_by_energy_and_education(
-    db, energy_collection_name, education_collection_name, n_matches, year=2010
+    db,
+    energy_collection_name,
+    education_collection_name,
+    countries_collection_name,
+    n_matches,
+    year=2010,
 ):
-    """
-    Ordena países pelo consumo total de energia no ano especificado
-    e exibe dados educacionais associados.
-    """
-
-    consumption_fields = [
-        "coal_consumption",
-        "solar_consumption",
-        "wind_consumption",
-        "gas_consumption",
-        "hydro_consumption",
-        "nuclear_consumption",
-        "oil_consumption",
-        "other_renewable_consumption",
-    ]
-
-    total_consumption_expr = {
-        "$add": [{"$ifNull": [f"${field}", 0]} for field in consumption_fields]
-    }
+    countries = [doc["country"] for doc in db[countries_collection_name].find()]
 
     pipeline = [
-        {"$match": {"year": year}},
+        {
+            "$match": {
+                "year": year,
+                "country": {"$in": countries}
+            }
+        },
+        {
+            "$group": {
+                "_id": "$country",
+                "total_consumption": {"$sum": "$consumption"},
+                "year": {"$first": "$year"},  # Keep the year field
+            }
+        },
+        # Lookup education data for each country
         {
             "$lookup": {
                 "from": education_collection_name,
-                "localField": "country",
+                "localField": "_id",
                 "foreignField": "country",
                 "as": "education_data",
                 "pipeline": [
@@ -259,7 +259,7 @@ def sort_countries_by_energy_and_education(
                         "$match": {
                             "year": year,
                             "agefrom": 15,
-                            "ageto": 999,
+                            "ageto": 999
                         }
                     },
                     {
@@ -277,14 +277,12 @@ def sort_countries_by_energy_and_education(
             }
         },
         {"$unwind": "$education_data"},
-        {"$addFields": {"total_consumption": total_consumption_expr}},
-        {"$match": {"total_consumption": {"$ne": None}}},
         {"$sort": {"total_consumption": -1}},
         {"$limit": n_matches},
         {
             "$project": {
                 "_id": 0,
-                "country": 1,
+                "country": "$_id",
                 "year": 1,
                 "total_consumption": 1,
                 "education_level": "$education_data",
@@ -296,7 +294,7 @@ def sort_countries_by_energy_and_education(
     results = list(energy_collection.aggregate(pipeline))
 
     if not results:
-        print("⚠️ Nenhum país com dados de consumo total encontrados.")
+        print("⚠️ No countries with total consumption data found.")
         return
 
     for doc in results:
@@ -584,18 +582,19 @@ client = MongoClient(uri)
 db = client["education_and_energy"]
 
 
-rank_countries_by_education_increase(
-    db,
-    "energy",
-    "education",
-    "countries",
-    EducationIncreaseMetric.AVG_SCHOOL_YEARS.value,
-    1990,
-    1995,
-    ["oil_consumption"],
-    10,
-)
-# sort_countries_by_energy_and_education(db, "energy", "education", 10)
+# rank_countries_by_education_increase(
+#     db,
+#     "energy",
+#     "education",
+#     "countries",
+#     EducationIncreaseMetric.AVG_SCHOOL_YEARS.value,
+#     1990,
+#     1995,
+#     ["oil_consumption"],
+#     10,
+# )
+
+sort_countries_by_energy_and_education(db, "energy", "education", "countries", 10)
 # get_education_distribution_by_age(db, "Brazil", 2010)
 # ecological_footprint_ranking(db, 2010)
 # top_countries_by_age_and_schooling(db, age_from=15, age_to=999, limit=5)
