@@ -234,12 +234,7 @@ def sort_countries_by_energy_and_education(
     countries = [doc["country"] for doc in db[countries_collection_name].find()]
 
     pipeline = [
-        {
-            "$match": {
-                "year": year,
-                "country": {"$in": countries}
-            }
-        },
+        {"$match": {"year": year, "country": {"$in": countries}}},
         {
             "$group": {
                 "_id": "$country",
@@ -255,13 +250,7 @@ def sort_countries_by_energy_and_education(
                 "foreignField": "country",
                 "as": "education_data",
                 "pipeline": [
-                    {
-                        "$match": {
-                            "year": year,
-                            "agefrom": 15,
-                            "ageto": 999
-                        }
-                    },
+                    {"$match": {"year": year, "agefrom": 15, "ageto": 999}},
                     {
                         "$project": {
                             "_id": 0,
@@ -321,60 +310,90 @@ def sort_countries_by_energy_and_education(
         )
         print("-" * 40)
 
+
 def get_education_distribution_by_age(db, country, year, limit):
     pipeline = [
         {"$match": {"country": country, "year": year}},
-        {"$project": {
-            "agefrom": 1,
-            "ageto": 1,
-            "no_schooling": 1,
-            "primary_schooling": 1,
-            "primary_schooling_complete": 1,
-            "secondary_schooling": 1,
-            "secondary_schooling_complete": 1,
-            "tertiary_schooling": 1,
-            "tertiary_schooling_complete": 1
-        }},
-        {"$addFields": {
-            "total": {
-                "$add": [
-                    {"$ifNull": ["$no_schooling", 0]},
-                    {"$ifNull": ["$primary_schooling", 0]},
-                    {"$ifNull": ["$secondary_schooling", 0]},
-                    {"$ifNull": ["$tertiary_schooling", 0]}
-                ]
+        {
+            "$project": {
+                "agefrom": 1,
+                "ageto": 1,
+                "no_schooling": 1,
+                "primary_schooling": 1,
+                "primary_schooling_complete": 1,
+                "secondary_schooling": 1,
+                "secondary_schooling_complete": 1,
+                "tertiary_schooling": 1,
+                "tertiary_schooling_complete": 1,
             }
-        }},
-        {"$project": {
-            "agefrom": 1,
-            "ageto": 1,
-            "no_schooling_pct": {
-                "$cond": [{"$gt": ["$total", 0]},
-                          {"$multiply": [{"$divide": ["$no_schooling", "$total"]}, 100]},
-                          0]
-            },
-            "primary_pct": {
-                "$cond": [{"$gt": ["$total", 0]},
-                          {"$multiply": [{"$divide": ["$primary_schooling", "$total"]}, 100]},
-                          0]
-            },
-            "secondary_pct": {
-                "$cond": [{"$gt": ["$total", 0]},
-                          {"$multiply": [{"$divide": ["$secondary_schooling", "$total"]}, 100]},
-                          0]
-            },
-            "tertiary_pct": {
-                "$cond": [{"$gt": ["$total", 0]},
-                          {"$multiply": [{"$divide": ["$tertiary_schooling", "$total"]}, 100]},
-                          0]
+        },
+        {
+            "$addFields": {
+                "total": {
+                    "$add": [
+                        {"$ifNull": ["$no_schooling", 0]},
+                        {"$ifNull": ["$primary_schooling", 0]},
+                        {"$ifNull": ["$secondary_schooling", 0]},
+                        {"$ifNull": ["$tertiary_schooling", 0]},
+                    ]
+                }
             }
-        }},
+        },
+        {
+            "$project": {
+                "agefrom": 1,
+                "ageto": 1,
+                "no_schooling_pct": {
+                    "$cond": [
+                        {"$gt": ["$total", 0]},
+                        {"$multiply": [{"$divide": ["$no_schooling", "$total"]}, 100]},
+                        0,
+                    ]
+                },
+                "primary_pct": {
+                    "$cond": [
+                        {"$gt": ["$total", 0]},
+                        {
+                            "$multiply": [
+                                {"$divide": ["$primary_schooling", "$total"]},
+                                100,
+                            ]
+                        },
+                        0,
+                    ]
+                },
+                "secondary_pct": {
+                    "$cond": [
+                        {"$gt": ["$total", 0]},
+                        {
+                            "$multiply": [
+                                {"$divide": ["$secondary_schooling", "$total"]},
+                                100,
+                            ]
+                        },
+                        0,
+                    ]
+                },
+                "tertiary_pct": {
+                    "$cond": [
+                        {"$gt": ["$total", 0]},
+                        {
+                            "$multiply": [
+                                {"$divide": ["$tertiary_schooling", "$total"]},
+                                100,
+                            ]
+                        },
+                        0,
+                    ]
+                },
+            }
+        },
         {"$sort": {"agefrom": 1}},
         {"$limit": limit},
     ]
 
     results = list(db.education.aggregate(pipeline))
-    
+
     print(f"\nDistribuição educacional em {country}, {year}:\n")
     for row in results:
         print(f"{row['agefrom']}-{row['ageto']} anos:")
@@ -385,98 +404,116 @@ def get_education_distribution_by_age(db, country, year, limit):
 
     return results
 
+
 def ecological_footprint_ranking(db, year, limit):
     pipeline = [
         {"$match": {"year": year}},
-        {"$lookup": {
-            "from": "education",  # para pegar a população
-            "let": {"country_name": "$country", "yr": "$year"},
-            "pipeline": [
-                {"$match": {
-                    "$expr": {
-                        "$and": [
-                            {"$eq": ["$country", "$$country_name"]},
-                            {"$eq": ["$year", "$$yr"]},
-                            {"$eq": ["$agefrom", 15]},
-                            {"$eq": ["$ageto", 999]}  # população total
-                        ]
-                    }
-                }},
-                {"$project": {"population": 1, "_id": 0}}
-            ],
-            "as": "population_data"
-        }},
-        {"$unwind": "$population_data"},
-        {"$addFields": {
-            "population": "$population_data.population",
-            "fossil_production": {
-                "$add": [
-                    {"$ifNull": ["$oil_electricity", 0]},
-                    {"$ifNull": ["$coal_electricity", 0]},
-                    {"$ifNull": ["$gas_electricity", 0]}
-                ]
-            },
-            "fossil_consumption": {
-                "$add": [
-                    {"$ifNull": ["$oil_consumption", 0]},
-                    {"$ifNull": ["$coal_consumption", 0]},
-                    {"$ifNull": ["$gas_consumption", 0]}
-                ]
-            },
-            "renewable_production": {
-                "$add": [
-                    {"$ifNull": ["$hydro_electricity", 0]},
-                    {"$ifNull": ["$wind_electricity", 0]},
-                    {"$ifNull": ["$solar_electricity", 0]},
-                    {"$ifNull": ["$nuclear_electricity", 0]},
-                    {"$ifNull": ["$other_renewable_electricity", 0]}
-                ]
-            },
-            "renewable_consumption": {
-                "$add": [
-                    {"$ifNull": ["$hydro_consumption", 0]},
-                    {"$ifNull": ["$wind_consumption", 0]},
-                    {"$ifNull": ["$solar_consumption", 0]},
-                    {"$ifNull": ["$nuclear_consumption", 0]},
-                    {"$ifNull": ["$other_renewable_consumption", 0]}
-                ]
-            }
-        }},
-        {"$addFields": {
-            "ecological_footprint_per_capita": {
-                "$cond": [
-                    {"$gt": ["$population", 0]},
+        {
+            "$lookup": {
+                "from": "education",  # para pegar a população
+                "let": {"country_name": "$country", "yr": "$year"},
+                "pipeline": [
                     {
-                        "$divide": [
-                            {"$subtract": [
-                                {"$add": ["$fossil_production", "$fossil_consumption"]},
-                                {"$add": ["$renewable_production", "$renewable_consumption"]}
-                            ]},
-                            "$population"
-                        ]
+                        "$match": {
+                            "$expr": {
+                                "$and": [
+                                    {"$eq": ["$country", "$$country_name"]},
+                                    {"$eq": ["$year", "$$yr"]},
+                                    {"$eq": ["$agefrom", 15]},
+                                    {"$eq": ["$ageto", 999]},  # população total
+                                ]
+                            }
+                        }
                     },
-                    None
-                ]
+                    {"$project": {"population": 1, "_id": 0}},
+                ],
+                "as": "population_data",
             }
-        }},
-        {"$project": {
-            "country": 1,
-            "ecological_footprint_per_capita": 1
-        }},
+        },
+        {"$unwind": "$population_data"},
+        {
+            "$addFields": {
+                "population": "$population_data.population",
+                "fossil_production": {
+                    "$add": [
+                        {"$ifNull": ["$oil_electricity", 0]},
+                        {"$ifNull": ["$coal_electricity", 0]},
+                        {"$ifNull": ["$gas_electricity", 0]},
+                    ]
+                },
+                "fossil_consumption": {
+                    "$add": [
+                        {"$ifNull": ["$oil_consumption", 0]},
+                        {"$ifNull": ["$coal_consumption", 0]},
+                        {"$ifNull": ["$gas_consumption", 0]},
+                    ]
+                },
+                "renewable_production": {
+                    "$add": [
+                        {"$ifNull": ["$hydro_electricity", 0]},
+                        {"$ifNull": ["$wind_electricity", 0]},
+                        {"$ifNull": ["$solar_electricity", 0]},
+                        {"$ifNull": ["$nuclear_electricity", 0]},
+                        {"$ifNull": ["$other_renewable_electricity", 0]},
+                    ]
+                },
+                "renewable_consumption": {
+                    "$add": [
+                        {"$ifNull": ["$hydro_consumption", 0]},
+                        {"$ifNull": ["$wind_consumption", 0]},
+                        {"$ifNull": ["$solar_consumption", 0]},
+                        {"$ifNull": ["$nuclear_consumption", 0]},
+                        {"$ifNull": ["$other_renewable_consumption", 0]},
+                    ]
+                },
+            }
+        },
+        {
+            "$addFields": {
+                "ecological_footprint_per_capita": {
+                    "$cond": [
+                        {"$gt": ["$population", 0]},
+                        {
+                            "$divide": [
+                                {
+                                    "$subtract": [
+                                        {
+                                            "$add": [
+                                                "$fossil_production",
+                                                "$fossil_consumption",
+                                            ]
+                                        },
+                                        {
+                                            "$add": [
+                                                "$renewable_production",
+                                                "$renewable_consumption",
+                                            ]
+                                        },
+                                    ]
+                                },
+                                "$population",
+                            ]
+                        },
+                        None,
+                    ]
+                }
+            }
+        },
+        {"$project": {"country": 1, "ecological_footprint_per_capita": 1}},
         {"$sort": {"ecological_footprint_per_capita": 1}},
-        { "$limit": limit }
+        {"$limit": limit},
     ]
 
     results = list(db.energy.aggregate(pipeline))
 
     print(f"\nRanking de países por menor pegada ecológica per capita no ano {year}:\n")
     for rank, row in enumerate(results, 1):
-        ef = row['ecological_footprint_per_capita']
+        ef = row["ecological_footprint_per_capita"]
         ef_display = f"{ef:.6f}" if ef is not None else "N/A"
         print(f"{rank:2}. {row['country']:25} -> Pegada per capita: {ef_display}")
 
     return results
-    
+
 
 def top_countries_by_age_and_schooling(db, age_from: int, age_to: int, limit: int = 10):
     """
@@ -493,13 +530,13 @@ def top_countries_by_age_and_schooling(db, age_from: int, age_to: int, limit: in
     Efeito:
         Print dos resultados diretamente no console.
     """
-    
+
     pipeline = [
         {
             "$match": {
                 "agefrom": age_from,
                 "ageto": age_to,
-                "schooling_years_avg": {"$gt": 0}
+                "schooling_years_avg": {"$gt": 0},
             }
         },
         {
@@ -512,7 +549,7 @@ def top_countries_by_age_and_schooling(db, age_from: int, age_to: int, limit: in
                             "$expr": {
                                 "$and": [
                                     {"$eq": ["$country", "$$country_name"]},
-                                    {"$eq": ["$year", "$$year_val"]}
+                                    {"$eq": ["$year", "$$year_val"]},
                                 ]
                             }
                         }
@@ -529,23 +566,17 @@ def top_countries_by_age_and_schooling(db, age_from: int, age_to: int, limit: in
                                     {"$ifNull": ["$hydro_electricity", 0]},
                                     {"$ifNull": ["$nuclear_electricity", 0]},
                                     {"$ifNull": ["$oil_electricity", 0]},
-                                    {"$ifNull": ["$other_renewable_electricity", 0]}
+                                    {"$ifNull": ["$other_renewable_electricity", 0]},
                                 ]
-                            }
+                            },
                         }
-                    }
+                    },
                 ],
-                "as": "energy_data"
+                "as": "energy_data",
             }
         },
-        {
-            "$unwind": "$energy_data"
-        },
-        {
-            "$match": {
-                "energy_data.total_energy_production": {"$gt": 0}
-            }
-        },
+        {"$unwind": "$energy_data"},
+        {"$match": {"energy_data.total_energy_production": {"$gt": 0}}},
         {
             "$project": {
                 "_id": 0,
@@ -554,30 +585,29 @@ def top_countries_by_age_and_schooling(db, age_from: int, age_to: int, limit: in
                 "agefrom": 1,
                 "ageto": 1,
                 "schooling_years_avg": 1,
-                "total_energy_production": "$energy_data.total_energy_production"
+                "total_energy_production": "$energy_data.total_energy_production",
             }
         },
-        {
-            "$sort": {
-                "schooling_years_avg": -1
-            }
-        },
-        {
-            "$limit": limit
-        }
+        {"$sort": {"schooling_years_avg": -1}},
+        {"$limit": limit},
     ]
 
     resultados = db["education"].aggregate(pipeline)
 
-    print(f"\nTop {limit} países para faixa etária {age_from}-{age_to} ordenados por schooling_years_avg:\n")
+    print(
+        f"\nTop {limit} países para faixa etária {age_from}-{age_to} ordenados por schooling_years_avg:\n"
+    )
     for doc in resultados:
         schooling = doc.get("schooling_years_avg")
         energy = doc.get("total_energy_production")
 
         if schooling is not None and energy is not None:
-            print(f"- {doc['country']} ({doc['year']}): idade {doc['agefrom']}-{doc['ageto']}, "
-                  f"escolaridade média = {schooling:.2f}, "
-                  f"produção total de energia = {energy:.2f}")
+            print(
+                f"- {doc['country']} ({doc['year']}): idade {doc['agefrom']}-{doc['ageto']}, "
+                f"escolaridade média = {schooling:.2f}, "
+                f"produção total de energia = {energy:.2f}"
+            )
+
 
 uri = "mongodb://localhost:27017/"
 client = MongoClient(uri)
