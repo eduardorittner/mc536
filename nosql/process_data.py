@@ -27,7 +27,7 @@ def energy_type_from_field(field):
 
 def field_in_row(row, type, field):
     for energy in row:
-        if energy["energy_type"] == type:
+        if energy["type"] == type:
             return energy
 
     return None
@@ -44,7 +44,7 @@ def add_energy_field(row, country, year, field, value):
             old_dict["production"] = value
     else:
         new_dict = {}
-        new_dict["energy_type"] = type
+        new_dict["type"] = type
         new_dict["country"] = country
         new_dict["year"] = year
         if "consumption" in field:
