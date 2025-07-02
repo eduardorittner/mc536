@@ -58,6 +58,9 @@ Or using the pgAdmin4
 ## Physical Model
 The physical model generated from pgAdmin4 can be found on this [link](https://github.com/eduardorittner/mc536/blob/main/entrega_sql/schema.sql)
 
+## Logical Model
+The logical model generated from pgAdmin4 can be found here
+
 ## Database Schema
 
 The database schema is designed to store and manage information related to countries, population demographics, education, and electricity production and consumption. It includes six main tables with clearly defined relationships.
