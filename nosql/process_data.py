@@ -106,8 +106,8 @@ def process_energy(input_path, output_path, countries_path):
                     countries.append(value)
                 elif key == "year":
                     year = int(value)
-
                 else:
+                    value = float(value)
                     add_energy_field(processed_row, country, year, key, value)
             for energy in processed_row:
                 data.append(energy)
