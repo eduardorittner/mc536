@@ -26,40 +26,43 @@ def rank_countries_by_education_increase(
     energy_increase_projection = {}
     for metric_string in energy_metrics:
         metric_type, metric_name = metric_string.rsplit("_", 1)
+
         energy_increase_projection[metric_string] = {
             "$let": {
                 "vars": {
-                    "start_val": {"$arrayElemAt": [f"$start_docs.{metric_type}", 0]},
-                    "end_val": {"$arrayElemAt": [f"$end_docs.{metric_type}", 0]},
+                    "start_doc": {"$arrayElemAt": [{"$filter": {"input": "$start_docs", "as": "d", "cond": {"$eq": ["$$d.type", metric_type]}}}, 0]},
+                    "end_doc":   {"$arrayElemAt": [{"$filter": {"input": "$end_docs",   "as": "d", "cond": {"$eq": ["$$d.type", metric_type]}}}, 0]}
                 },
                 "in": {
-                    "$cond": [
-                        {
-                            "$and": [
-                                {"$ne": ["$$start_val", None]},
-                                {"$ne": ["$$end_val", None]},
-                                {"$ne": ["$$start_val", 0]},
-                            ]
+                    "$let": {
+                        "vars": {
+                            "start_val": {"$getField": {"field": metric_name, "input": "$$start_doc"}},
+                            "end_val":   {"$getField": {"field": metric_name, "input": "$$end_doc"}},
                         },
-                        {
-                            "$multiply": [
+                        "in": {
+                            "$cond": [
                                 {
-                                    "$divide": [
-                                        {"$subtract": ["$$end_val", "$$start_val"]},
-                                        "$$start_val",
+                                    "$and": [
+                                        {"$ne": ["$$start_val", None]},
+                                        {"$ne": ["$$end_val", None]},
+                                        {"$ne": ["$$start_val", 0]},
                                     ]
                                 },
-                                100,
+                                {
+                                    "$multiply": [
+                                        {"$divide": [{"$subtract": ["$$end_val", "$$start_val"]}, "$$start_val"]},
+                                        100
+                                    ]
+                                },
+                                None,
                             ]
-                        },
-                        None,
-                    ]
-                },
+                        }
+                    }
+                }
             }
         }
 
     pipeline = [
-        # Education calculation stages remain the same
         {
             "$match": {
                 "country": {"$in": countries},
@@ -179,6 +182,7 @@ def rank_countries_by_education_increase(
         },
         {"$limit": limit},
     ]
+
 
     results = list(education_collection.aggregate(pipeline))
 
@@ -620,17 +624,17 @@ db = client["education_and_energy"]
 # Query Examples:
 # Uncomment the code and modify values
 
-# rank_countries_by_education_increase(
-#     db,
-#     "energy",
-#     "education",
-#     "countries",
-#     EducationIncreaseMetric.AVG_SCHOOL_YEARS.value,
-#     1990,
-#     1995,
-#     ["oil_consumption"],
-#     10,
-# )
+rank_countries_by_education_increase(
+    db,
+    "energy",
+    "education",
+    "countries",
+    EducationIncreaseMetric.AVG_SCHOOL_YEARS.value,
+    2000,
+    2005,
+    ["oil_production", "hydro_consumption"],
+    10,
+)
 
 #sort_countries_by_energy_and_education(db, "energy", "education", "countries", 10)
 
@@ -638,4 +642,4 @@ db = client["education_and_energy"]
 
 #ecological_footprint_ranking(db, "energy", "education", "countries", 1990, 5)
 
-top_countries_by_age_and_schooling(db, "energy", "education", 1990, age_from=15, age_to=999, limit=5)
+#top_countries_by_age_and_schooling(db, "energy", "education", 1990, age_from=15, age_to=999, limit=5)
