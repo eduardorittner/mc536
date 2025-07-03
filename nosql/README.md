@@ -37,9 +37,11 @@ MongoDB é projetado para escalabilidade horizontal com particionamento automát
 
 # Modelo lógico
 
-/home/c-ec2022/ra244185/Pictures/Lógico
+
 
 # Modelo físico
+
+https://github.com/eduardorittner/mc536/blob/main/nosql/F%C3%ADsico.png
 
 # Consultas
 
